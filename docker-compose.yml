@@ -1,0 +1,14 @@
+services:
+  multistore-console:
+    image: yuuuuu0/multistore-console:latest
+    container_name: multistore-console
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - DATABASE_URL=file:/app/data/console.db
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-change-me-to-random-32-chars}
+      - NEXTAUTH_URL=${NEXTAUTH_URL:-http://localhost:3000}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-change-me-to-random-32-chars}
+    restart: unless-stopped
