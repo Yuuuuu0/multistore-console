@@ -5,6 +5,7 @@ import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Footer } from "@/components/footer";
 
 function GitHubIcon({ className }: { className?: string }) {
   return (
@@ -42,7 +43,7 @@ export function LoginForm({ hasGithub, passwordLoginEnabled }: { hasGithub: bool
   const showDivider = passwordLoginEnabled && hasGithub;
 
   return (
-    <div className="flex min-h-screen items-center justify-center">
+    <div className="flex min-h-screen flex-col items-center justify-center">
       <div className="w-full max-w-sm space-y-6 p-8 border rounded-lg shadow-sm">
         <h1 className="text-2xl font-bold text-center">MultiStore Console</h1>
         {passwordLoginEnabled && (
@@ -87,6 +88,7 @@ export function LoginForm({ hasGithub, passwordLoginEnabled }: { hasGithub: bool
           </Button>
         )}
       </div>
+      <Footer />
     </div>
   );
 }

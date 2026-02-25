@@ -79,6 +79,8 @@ npm run dev
 
 GitHub OAuth 配置（Client ID / Secret）在 Web 界面的设置页面中配置，无需环境变量。
 
+> **注意**：如果使用 GitHub OAuth 单点登录，`NEXTAUTH_URL` 必须设置为实际的站点访问地址（例如 `https://console.example.com`），而非默认的 `http://localhost:3000`。否则 GitHub OAuth 回调地址不匹配，将导致登录失败。
+
 ## Docker 部署（推荐）
 
 ```bash
@@ -124,6 +126,11 @@ lib/
 prisma/
   schema.prisma    # 数据模型定义
 ```
+
+## 链接
+
+- **GitHub**: [https://github.com/Yuuuuu0/multistore-console](https://github.com/Yuuuuu0/multistore-console)
+- **问题反馈**: [Issues](https://github.com/Yuuuuu0/multistore-console/issues)
 
 ## License
 

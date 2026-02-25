@@ -30,8 +30,10 @@ import {
   Loader2,
   LogOut,
   AlertTriangle,
+  Info,
 } from "lucide-react";
 import Link from "next/link";
+import { Footer } from "@/components/footer";
 import {
   Dialog,
   DialogContent,
@@ -657,11 +659,14 @@ export function FileBrowser() {
           <Link href="/settings">
             <Button variant="ghost" className="w-full justify-start"><Settings className="w-4 h-4 mr-2" />设置</Button>
           </Link>
+          <Link href="/about">
+            <Button variant="ghost" className="w-full justify-start"><Info className="w-4 h-4 mr-2" />关于</Button>
+          </Link>
           <Button variant="ghost" className="w-full justify-start text-destructive hover:text-destructive" onClick={() => signOut({ callbackUrl: "/login" })}>
             <LogOut className="w-4 h-4 mr-2" />退出登录
           </Button>
         </nav>
-        <div className="flex-1 overflow-auto p-2">
+        <div className="flex-1 overflow-auto p-2 min-h-0">
           <div className="flex items-center justify-between px-2 mb-2">
             <div className="text-xs font-semibold text-muted-foreground">存储商</div>
             <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={openAddDialog}><Plus className="w-4 h-4" /></Button>
@@ -694,6 +699,9 @@ export function FileBrowser() {
               ))}
             </div>
           )}
+        </div>
+        <div className="flex-shrink-0 border-t">
+          <Footer />
         </div>
       </div>
 

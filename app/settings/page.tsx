@@ -3,6 +3,7 @@ import { GitHubBindingForm } from "./github-form";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
+import { Footer } from "@/components/footer";
 
 export default async function SettingsPage() {
   return (
@@ -33,6 +34,7 @@ export default async function SettingsPage() {
             </div>
           </div>
         </div>
+        <Footer />
       </div>
     </div>
   );
