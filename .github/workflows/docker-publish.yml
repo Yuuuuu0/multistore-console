@@ -27,6 +27,10 @@ jobs:
           username: yuuuuu0
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Get version from package.json
+        id: version
+        run: echo "VERSION=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
@@ -35,6 +39,6 @@ jobs:
           push: true
           tags: |
             yuuuuu0/multistore-console:latest
-            yuuuuu0/multistore-console:${{ github.sha }}
+            yuuuuu0/multistore-console:${{ steps.version.outputs.VERSION }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
