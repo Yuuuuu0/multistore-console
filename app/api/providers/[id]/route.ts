@@ -1,15 +1,22 @@
-import { auth } from "@/lib/auth";
+import { requireSession } from "@/lib/api-auth";
 import { prisma } from "@/lib/db";
 import { encrypt } from "@/lib/crypto";
+import { checkEndpoint } from "@/lib/url-validator";
 import { NextResponse } from "next/server";
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await auth();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const [, authError] = await requireSession();
+  if (authError) return authError;
 
   const { id } = await params;
   const { name, type, accessKeyId, secretAccessKey, endpoint, region, forcePathStyle, disableChunked, buckets } =
     await req.json();
+
+  if (endpoint) {
+    const endpointError = checkEndpoint(endpoint);
+    if (endpointError) return endpointError;
+  }
+
   const data: Record<string, unknown> = { name, type, accessKeyId, endpoint, region };
   if (secretAccessKey) data.secretAccessKey = encrypt(secretAccessKey);
   if (typeof forcePathStyle === "boolean") data.forcePathStyle = forcePathStyle;
@@ -33,8 +40,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 }
 
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await auth();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const [, authError] = await requireSession();
+  if (authError) return authError;
 
   const { id } = await params;
   await prisma.provider.delete({ where: { id } });

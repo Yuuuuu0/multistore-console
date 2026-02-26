@@ -1,12 +1,13 @@
-import { auth } from "@/lib/auth";
+import { requireSession } from "@/lib/api-auth";
 import { prisma } from "@/lib/db";
 import { getStorageAdapter } from "@/lib/storage";
+import { toErrorMessage } from "@/lib/errors";
 import { NextResponse } from "next/server";
 
 // List all transfer tasks
 export async function GET() {
-  const session = await auth();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const [, authError] = await requireSession();
+  if (authError) return authError;
 
   const tasks = await prisma.transferTask.findMany({
     orderBy: { createdAt: "desc" },
@@ -17,8 +18,8 @@ export async function GET() {
 
 // Create a new transfer task
 export async function POST(req: Request) {
-  const session = await auth();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const [, authError] = await requireSession();
+  if (authError) return authError;
 
   const { srcProviderId, srcBucket, srcKey, dstProviderId, dstBucket, dstKey } = await req.json();
 
@@ -39,49 +40,38 @@ export async function POST(req: Request) {
 }
 
 async function executeTransfer(taskId: string) {
-  try {
-    await prisma.transferTask.update({
-      where: { id: taskId },
-      data: { status: "RUNNING", progress: 0 },
-    });
-
-    const task = await prisma.transferTask.findUnique({ where: { id: taskId } });
-    if (!task) return;
-
-    const srcAdapter = await getStorageAdapter(task.srcProviderId);
-    const dstAdapter = await getStorageAdapter(task.dstProviderId);
-
-    // Download from source
-    await prisma.transferTask.update({
-      where: { id: taskId },
-      data: { progress: 20 },
-    });
-
-    const stream = await srcAdapter.getObject(task.srcBucket, task.srcKey);
-
-    // Read into buffer (for simplicity; large files could use multipart)
-    const chunks: Buffer[] = [];
-    for await (const chunk of stream) {
-      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-    }
-    const buffer = Buffer.concat(chunks);
-
-    await prisma.transferTask.update({
-      where: { id: taskId },
-      data: { progress: 60 },
-    });
-
-    // Upload to destination
-    await dstAdapter.putObject(task.dstBucket, task.dstKey, buffer, buffer.length);
-
-    await prisma.transferTask.update({
-      where: { id: taskId },
-      data: { status: "SUCCEEDED", progress: 100 },
-    });
-  } catch (e: any) {
-    await prisma.transferTask.update({
-      where: { id: taskId },
-      data: { status: "FAILED", error: e.message || "传输失败" },
-    });
-  }
+  try { await prisma.transferTask.update({
+    where: { id: taskId },
+    data: { status: "RUNNING", progress: 0 },
+  });
+  
+  const task = await prisma.transferTask.findUnique({ where: { id: taskId } });
+  if (!task) return;
+  
+  const srcAdapter = await getStorageAdapter(task.srcProviderId);
+  const dstAdapter = await getStorageAdapter(task.dstProviderId);
+  
+  // Download from source
+  await prisma.transferTask.update({
+    where: { id: taskId },
+    data: { progress: 20 },
+  });
+  
+  const stream = await srcAdapter.getObject(task.srcBucket, task.srcKey);
+  
+  await prisma.transferTask.update({
+    where: { id: taskId },
+    data: { progress: 60 },
+  });
+  
+  // 直接流式传输，不缓冲到内存
+  await dstAdapter.putObject(task.dstBucket, task.dstKey, stream);
+  
+  await prisma.transferTask.update({
+    where: { id: taskId },
+    data: { status: "SUCCEEDED", progress: 100 },
+  }); } catch (e: unknown) { await prisma.transferTask.update({
+    where: { id: taskId },
+    data: { status: "FAILED", error: toErrorMessage(e) || "传输失败" },
+  }); }
 }

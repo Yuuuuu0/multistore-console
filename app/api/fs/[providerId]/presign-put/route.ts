@@ -1,10 +1,11 @@
-import { auth } from "@/lib/auth";
+import { requireSession } from "@/lib/api-auth";
 import { getStorageAdapter } from "@/lib/storage";
+import { toErrorMessage } from "@/lib/errors";
 import { NextResponse } from "next/server";
 
 export async function GET(req: Request, { params }: { params: Promise<{ providerId: string }> }) {
-  const session = await auth();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const [, authError] = await requireSession();
+  if (authError) return authError;
 
   const { providerId } = await params;
   const { searchParams } = new URL(req.url);
@@ -13,11 +14,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ provider
   const contentType = searchParams.get("contentType") ?? undefined;
   if (!bucket || !key) return NextResponse.json({ error: "缺少参数" }, { status: 400 });
 
-  try {
-    const adapter = await getStorageAdapter(providerId);
-    const url = await adapter.getPresignedPutUrl(bucket, key, { expiresIn: 900, contentType });
-    return NextResponse.json({ url, method: "PUT", headers: contentType ? { "Content-Type": contentType } : {} });
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 500 });
-  }
+  try { const adapter = await getStorageAdapter(providerId);
+  const url = await adapter.getPresignedPutUrl(bucket, key, { expiresIn: 900, contentType });
+  return NextResponse.json({ url, method: "PUT", headers: contentType ? { "Content-Type": contentType } : {} }); } catch (e: unknown) { return NextResponse.json({ error: toErrorMessage(e) }, { status: 500 }); }
 }

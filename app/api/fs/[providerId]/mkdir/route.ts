@@ -1,13 +1,14 @@
-import { auth } from "@/lib/auth";
+import { requireSession } from "@/lib/api-auth";
 import { getStorageAdapter } from "@/lib/storage";
+import { toErrorMessage } from "@/lib/errors";
 import { NextResponse } from "next/server";
 
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ providerId: string }> }
 ) {
-  const session = await auth();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const [, authError] = await requireSession();
+  if (authError) return authError;
 
   const { providerId } = await params;
   const { bucket, prefix } = await req.json();
@@ -19,13 +20,9 @@ export async function POST(
   // Ensure folder key ends with /
   const folderKey = prefix.endsWith("/") ? prefix : prefix + "/";
 
-  try {
-    const adapter = await getStorageAdapter(providerId);
-    // Create empty object with trailing slash as folder marker
-    await adapter.putObject(bucket, folderKey, Buffer.from(""), 0);
-    return NextResponse.json({ success: true });
-  } catch (e: any) {
-    console.error(`[mkdir] Provider ${providerId} 错误:`, e);
-    return NextResponse.json({ error: e.message || "创建文件夹失败" }, { status: 500 });
-  }
+  try { const adapter = await getStorageAdapter(providerId);
+  // Create empty object with trailing slash as folder marker
+  await adapter.putObject(bucket, folderKey, Buffer.from(""), 0);
+  return NextResponse.json({ success: true }); } catch (e: unknown) { console.error(`[mkdir] Provider ${providerId} 错误:`, e);
+  return NextResponse.json({ error: toErrorMessage(e) || "创建文件夹失败" }, { status: 500 }); }
 }

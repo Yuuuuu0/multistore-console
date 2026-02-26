@@ -26,28 +26,24 @@ export function PasswordChangeForm() {
     }
 
     setLoading(true);
-    try {
-      const res = await fetch("/api/user/password", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ currentPassword, newPassword }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        toast.error(data.error || "修改失败");
-        return;
-      }
-
-      toast.success("密码修改成功，请重新登录");
-      // 等待 toast 显示后再登出
-      setTimeout(() => {
-        signOut({ callbackUrl: "/login" });
-      }, 1000);
-    } catch (error) {
-      toast.error("网络错误");
-    } finally {
+    try { const res = await fetch("/api/user/password", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ currentPassword, newPassword }),
+    });
+    
+    const data = await res.json();
+    
+    if (!res.ok) {
+      toast.error(data.error || "修改失败");
+      return;
+    }
+    
+    toast.success("密码修改成功，请重新登录");
+    // 等待 toast 显示后再登出
+    setTimeout(() => {
+      signOut({ callbackUrl: "/login" });
+    }, 1000); } catch (error: unknown) { toast.error("网络错误"); } finally {
       setLoading(false);
     }
   }

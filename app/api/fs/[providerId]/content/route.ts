@@ -1,5 +1,6 @@
-import { auth } from "@/lib/auth";
+import { requireSession } from "@/lib/api-auth";
 import { getStorageAdapter } from "@/lib/storage";
+import { toErrorMessage } from "@/lib/errors";
 import { NextResponse } from "next/server";
 
 const MAX_PREVIEW_SIZE = 512 * 1024; // 512KB max for text preview
@@ -8,8 +9,8 @@ export async function GET(
   req: Request,
   { params }: { params: Promise<{ providerId: string }> }
 ) {
-  const session = await auth();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const [, authError] = await requireSession();
+  if (authError) return authError;
 
   const { providerId } = await params;
   const { searchParams } = new URL(req.url);
@@ -20,29 +21,25 @@ export async function GET(
     return NextResponse.json({ error: "缺少参数" }, { status: 400 });
   }
 
-  try {
-    const adapter = await getStorageAdapter(providerId);
-
-    // Check file size first
-    const head = await adapter.headObject(bucket, key);
-    const size = head.ContentLength ?? 0;
-    if (size > MAX_PREVIEW_SIZE) {
-      return NextResponse.json({ error: "文件过大，无法预览", size }, { status: 413 });
-    }
-
-    const stream = await adapter.getObject(bucket, key);
-
-    // Read stream to buffer
-    const chunks: Buffer[] = [];
-    for await (const chunk of stream) {
-      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-    }
-    const buffer = Buffer.concat(chunks);
-    const content = buffer.toString("utf-8");
-
-    return NextResponse.json({ content, size });
-  } catch (e: any) {
-    console.error(`[content] Provider ${providerId} 错误:`, e);
-    return NextResponse.json({ error: e.message || "获取内容失败" }, { status: 500 });
+  try { const adapter = await getStorageAdapter(providerId);
+  
+  // Check file size first
+  const head = await adapter.headObject(bucket, key);
+  const size = head.ContentLength ?? 0;
+  if (size > MAX_PREVIEW_SIZE) {
+    return NextResponse.json({ error: "文件过大，无法预览", size }, { status: 413 });
   }
+  
+  const stream = await adapter.getObject(bucket, key);
+  
+  // Read stream to buffer
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  const buffer = Buffer.concat(chunks);
+  const content = buffer.toString("utf-8");
+  
+  return NextResponse.json({ content, size }); } catch (e: unknown) { console.error(`[content] Provider ${providerId} 错误:`, e);
+  return NextResponse.json({ error: toErrorMessage(e) || "获取内容失败" }, { status: 500 }); }
 }

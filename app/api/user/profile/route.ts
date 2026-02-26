@@ -1,10 +1,10 @@
-import { auth } from "@/lib/auth";
+import { requireSession } from "@/lib/api-auth";
 import { prisma } from "@/lib/db";
 import { NextResponse } from "next/server";
 
 export async function GET() {
-  const session = await auth();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const [session, authError] = await requireSession();
+  if (authError) return authError;
 
   const user = await prisma.user.findUnique({
     where: { id: (session.user as any).id },

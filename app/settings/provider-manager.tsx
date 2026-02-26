@@ -57,23 +57,19 @@ export function ProviderManager() {
 
   async function loadProviders() {
     console.log("[ProviderManager] 开始加载存储商列表");
-    try {
-      const res = await fetch("/api/providers");
-      console.log("[ProviderManager] API 响应:", res.status, res.statusText);
-
-      if (res.ok) {
-        const data = await res.json();
-        console.log("[ProviderManager] 加载成功，数量:", data.length);
-        setProviders(data);
-      } else {
-        const data = await res.json().catch(() => ({}));
-        console.error("[ProviderManager] 加载失败:", res.status, data);
-        toast.error(data.error || `加载失败 (${res.status})`);
-      }
-    } catch (error) {
-      console.error("[ProviderManager] 网络错误:", error);
-      toast.error("网络错误");
-    } finally {
+    try { const res = await fetch("/api/providers");
+    console.log("[ProviderManager] API 响应:", res.status, res.statusText);
+    
+    if (res.ok) {
+      const data = await res.json();
+      console.log("[ProviderManager] 加载成功，数量:", data.length);
+      setProviders(data);
+    } else {
+      const data = await res.json().catch(() => ({}));
+      console.error("[ProviderManager] 加载失败:", res.status, data);
+      toast.error(data.error || `加载失败 (${res.status})`);
+    } } catch (error: unknown) { console.error("[ProviderManager] 网络错误:", error);
+    toast.error("网络错误"); } finally {
       setLoading(false);
     }
   }
@@ -121,44 +117,36 @@ export function ProviderManager() {
       return;
     }
 
-    try {
-      const url = editingProvider ? `/api/providers/${editingProvider.id}` : "/api/providers";
-      const method = editingProvider ? "PUT" : "POST";
-
-      const res = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        toast.error(data.error || "操作失败");
-        return;
-      }
-
-      toast.success(editingProvider ? "更新成功" : "添加成功");
-      setDialogOpen(false);
-      loadProviders();
-    } catch (error) {
-      toast.error("网络错误");
+    try { const url = editingProvider ? `/api/providers/${editingProvider.id}` : "/api/providers";
+    const method = editingProvider ? "PUT" : "POST";
+    
+    const res = await fetch(url, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(formData),
+    });
+    
+    if (!res.ok) {
+      const data = await res.json();
+      toast.error(data.error || "操作失败");
+      return;
     }
+    
+    toast.success(editingProvider ? "更新成功" : "添加成功");
+    setDialogOpen(false);
+    loadProviders(); } catch (error: unknown) { toast.error("网络错误"); }
   }
 
   async function handleDelete(id: string) {
     if (!confirm("确定删除此存储商？")) return;
 
-    try {
-      const res = await fetch(`/api/providers/${id}`, { method: "DELETE" });
-      if (res.ok) {
-        toast.success("删除成功");
-        loadProviders();
-      } else {
-        toast.error("删除失败");
-      }
-    } catch (error) {
-      toast.error("网络错误");
-    }
+    try { const res = await fetch(`/api/providers/${id}`, { method: "DELETE" });
+    if (res.ok) {
+      toast.success("删除成功");
+      loadProviders();
+    } else {
+      toast.error("删除失败");
+    } } catch (error: unknown) { toast.error("网络错误"); }
   }
 
   if (loading) {

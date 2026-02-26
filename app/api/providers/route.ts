@@ -1,11 +1,12 @@
-import { auth } from "@/lib/auth";
+import { requireSession } from "@/lib/api-auth";
 import { prisma } from "@/lib/db";
 import { encrypt } from "@/lib/crypto";
+import { checkEndpoint } from "@/lib/url-validator";
 import { NextResponse } from "next/server";
 
 export async function GET() {
-  const session = await auth();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const [, authError] = await requireSession();
+  if (authError) return authError;
 
   const providers = await prisma.provider.findMany({
     orderBy: { createdAt: "asc" },
@@ -31,11 +32,17 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const session = await auth();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const [, authError] = await requireSession();
+  if (authError) return authError;
 
   const { name, type, accessKeyId, secretAccessKey, endpoint, region, forcePathStyle, disableChunked, buckets } =
     await req.json();
+
+  if (endpoint) {
+    const endpointError = checkEndpoint(endpoint);
+    if (endpointError) return endpointError;
+  }
+
   if (!name || !type || !accessKeyId || !secretAccessKey) {
     return NextResponse.json({ error: "缺少必填字段" }, { status: 400 });
   }

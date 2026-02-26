@@ -1,12 +1,12 @@
-import { auth } from "@/lib/auth";
+import { requireSession } from "@/lib/api-auth";
 import { prisma } from "@/lib/db";
-import { encrypt, decrypt } from "@/lib/crypto";
+import { encrypt } from "@/lib/crypto";
 import { NextResponse } from "next/server";
 
 // 设置 GitHub 白名单用户名 + OAuth 凭证
 export async function POST(req: Request) {
-  const session = await auth();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const [, authError] = await requireSession();
+  if (authError) return authError;
 
   const body = await req.json();
 
@@ -47,8 +47,8 @@ export async function POST(req: Request) {
 
 // 解绑 GitHub
 export async function DELETE() {
-  const session = await auth();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const [session, authError] = await requireSession();
+  if (authError) return authError;
 
   const user = await prisma.user.findUnique({ where: { id: (session.user as any).id } });
   if (!user) return NextResponse.json({ error: "用户不存在" }, { status: 404 });

@@ -1,10 +1,14 @@
-import { auth } from "@/lib/auth";
+import { requireSession } from "@/lib/api-auth";
+import { checkRateLimit, RATE_LIMIT_PRESETS } from "@/lib/rate-limit";
 import { prisma } from "@/lib/db";
 import { NextResponse } from "next/server";
 
 export async function PUT(req: Request) {
-  const session = await auth();
-  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const [session, authError] = await requireSession();
+  if (authError) return authError;
+
+  const limited = checkRateLimit(req, "password-login", RATE_LIMIT_PRESETS.sensitive);
+  if (limited) return limited;
 
   const { enabled } = await req.json();
   const user = await prisma.user.findUnique({ where: { id: session.user.id } });
