@@ -9,10 +9,13 @@
 - 文件管理 — 上传、下载、重命名、复制、移动、删除文件和文件夹
 - 文件预览 — 支持图片、视频、音频、PDF、文本文件在线预览
 - 拖拽上传 — 拖拽文件到浏览器即可上传，带进度显示
+- 大文件分片上传 — 支持 Multipart Upload，断点续传，上传队列管理
 - 批量操作 — 多选文件进行批量删除、批量 ZIP 打包下载
-- 跨云传输 — 在不同存储提供商之间传输文件，后台异步执行
+- 右键菜单 — 文件列表支持右键上下文菜单，快捷操作
+- 跨云传输 — 在不同存储提供商之间传输文件，后台异步执行，支持传输任务列表和详情查看
 - 文件搜索 — 按文件名快速过滤当前目录内容
-- 文件夹递归删除 — 安全删除文件夹及其所有子内容
+- 文件夹递归删除 — 安全删除文件夹及其所有子内容（深度优先有序清理）
+- 审计日志 — 完整操作审计追踪，可配置保留策略（1-365 天），覆盖文件、提供商、认证、传输等全部操作
 - 用户认证 — 支持密码登录和 GitHub OAuth
 - 凭证加密 — 存储提供商的 Access Key / Secret Key 使用 AES-256-GCM 加密存储
 - Docker 部署 — 提供 Dockerfile 和 docker-compose.yml，开箱即用
@@ -104,28 +107,6 @@ docker compose logs multistore-console
 用户名为 `admin`，密码在日志中显示。登录后建议立即修改密码或绑定 GitHub SSO。
 
 `docker-compose.yml` 已包含完整配置，按需修改环境变量即可。
-
-## 项目结构
-
-```
-app/
-  api/
-    auth/          # 认证相关 API
-    fs/[providerId]/ # 文件操作 API (list/upload/delete/rename/copy/presign/zip...)
-    providers/     # 存储提供商 CRUD + 连接测试
-    transfers/     # 跨云传输任务
-    user/          # 用户管理 (密码/GitHub绑定/个人资料)
-  dashboard/       # 主界面 (文件浏览器)
-  settings/        # 设置页面
-lib/
-  auth.ts          # NextAuth 配置
-  crypto.ts        # AES-256-GCM 加密/解密
-  storage/
-    adapter.ts     # 存储适配器 (统一接口)
-    client.ts      # S3 客户端工厂
-prisma/
-  schema.prisma    # 数据模型定义
-```
 
 ## 链接
 
