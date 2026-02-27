@@ -1,4 +1,5 @@
 import { requireSession } from "@/lib/api-auth";
+import { logAudit } from "@/lib/audit";
 import { getStorageAdapter } from "@/lib/storage";
 import { toErrorMessage } from "@/lib/errors";
 import { NextResponse } from "next/server";
@@ -10,7 +11,7 @@ export async function DELETE(
   req: Request,
   { params }: { params: Promise<{ providerId: string }> }
 ) {
-  const [, authError] = await requireSession();
+  const [session, authError] = await requireSession();
   if (authError) return authError;
 
   const { providerId } = await params;
@@ -38,6 +39,20 @@ export async function DELETE(
     return NextResponse.json({ error: "缺少 key 或 keys 参数" }, { status: 400 });
   }
   
+  const isBatch = Array.isArray(body.keys) && body.keys.length > 0;
+  await logAudit({
+    action: isBatch ? "FILE_BATCH_DELETE" : "FILE_DELETE",
+    description: isBatch
+      ? `批量删除 ${body.keys.length} 个文件 (${bucket})`
+      : `删除文件 ${body.key} (${bucket})`,
+    userId: session.user.id,
+    username: session.user.name || "unknown",
+    providerId,
+    bucket,
+    req,
+    metadata: isBatch ? { keys: body.keys } : { key: body.key },
+  });
+
   return NextResponse.json({ success: true }); } catch (e: unknown) { console.error(`[delete] Provider ${providerId} 错误:`, e);
   return NextResponse.json({ error: toErrorMessage(e) || "删除失败" }, { status: 500 }); }
 }

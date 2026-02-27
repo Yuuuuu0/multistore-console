@@ -8,6 +8,11 @@ import {
   DeleteObjectsCommand,
   CopyObjectCommand,
   HeadObjectCommand,
+  CreateMultipartUploadCommand,
+  UploadPartCommand,
+  CompleteMultipartUploadCommand,
+  AbortMultipartUploadCommand,
+  ListPartsCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import type { Readable } from "stream";
@@ -124,5 +129,98 @@ export class StorageAdapter {
       }),
       { expiresIn }
     );
+  }
+
+  // ---- Multipart Upload Methods ----
+
+  async createMultipartUpload(bucket: string, key: string, contentType?: string): Promise<string> {
+    const res = await this.client.send(
+      new CreateMultipartUploadCommand({
+        Bucket: bucket,
+        Key: key,
+        ...(contentType ? { ContentType: contentType } : {}),
+      })
+    );
+    if (!res.UploadId) throw new Error("Failed to create multipart upload");
+    return res.UploadId;
+  }
+
+  async getPresignedUploadPartUrl(
+    bucket: string,
+    key: string,
+    uploadId: string,
+    partNumber: number,
+    expiresIn = 3600
+  ): Promise<string> {
+    return getSignedUrl(
+      this.client,
+      new UploadPartCommand({
+        Bucket: bucket,
+        Key: key,
+        UploadId: uploadId,
+        PartNumber: partNumber,
+      }),
+      { expiresIn }
+    );
+  }
+
+  async completeMultipartUpload(
+    bucket: string,
+    key: string,
+    uploadId: string,
+    parts: { PartNumber: number; ETag: string }[]
+  ): Promise<void> {
+    await this.client.send(
+      new CompleteMultipartUploadCommand({
+        Bucket: bucket,
+        Key: key,
+        UploadId: uploadId,
+        MultipartUpload: {
+          Parts: parts.sort((a, b) => a.PartNumber - b.PartNumber),
+        },
+      })
+    );
+  }
+
+  async abortMultipartUpload(bucket: string, key: string, uploadId: string): Promise<void> {
+    await this.client.send(
+      new AbortMultipartUploadCommand({
+        Bucket: bucket,
+        Key: key,
+        UploadId: uploadId,
+      })
+    );
+  }
+
+  async listParts(
+    bucket: string,
+    key: string,
+    uploadId: string
+  ): Promise<{ partNumber: number; etag: string; size: number }[]> {
+    const allParts: { partNumber: number; etag: string; size: number }[] = [];
+    let partNumberMarker: string | undefined;
+
+    do {
+      const res = await this.client.send(
+        new ListPartsCommand({
+          Bucket: bucket,
+          Key: key,
+          UploadId: uploadId,
+          ...(partNumberMarker ? { PartNumberMarker: partNumberMarker } : {}),
+        })
+      );
+      for (const part of res.Parts ?? []) {
+        if (part.PartNumber && part.ETag && part.Size !== undefined) {
+          allParts.push({
+            partNumber: part.PartNumber,
+            etag: part.ETag,
+            size: part.Size,
+          });
+        }
+      }
+      partNumberMarker = res.IsTruncated ? res.NextPartNumberMarker : undefined;
+    } while (partNumberMarker);
+
+    return allParts;
   }
 }

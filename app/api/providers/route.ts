@@ -1,4 +1,5 @@
 import { requireSession } from "@/lib/api-auth";
+import { logAudit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 import { encrypt } from "@/lib/crypto";
 import { checkEndpoint } from "@/lib/url-validator";
@@ -32,7 +33,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const [, authError] = await requireSession();
+  const [session, authError] = await requireSession();
   if (authError) return authError;
 
   const { name, type, accessKeyId, secretAccessKey, endpoint, region, forcePathStyle, disableChunked, buckets } =
@@ -72,5 +73,15 @@ export async function POST(req: Request) {
       },
     },
   });
+  await logAudit({
+    action: "PROVIDER_CREATE",
+    description: `添加存储商 ${name}`,
+    userId: session.user.id,
+    username: session.user.name || "unknown",
+    providerName: name,
+    providerId: provider.id,
+    req,
+  });
+
   return NextResponse.json({ id: provider.id, name: provider.name });
 }

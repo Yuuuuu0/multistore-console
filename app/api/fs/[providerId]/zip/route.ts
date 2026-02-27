@@ -1,4 +1,5 @@
 import { requireSession } from "@/lib/api-auth";
+import { logAudit } from "@/lib/audit";
 import { getStorageAdapter } from "@/lib/storage";
 import { toErrorMessage } from "@/lib/errors";
 import { NextResponse } from "next/server";
@@ -12,7 +13,7 @@ export async function POST(
   req: Request,
   { params }: { params: Promise<{ providerId: string }> }
 ) {
-  const [, authError] = await requireSession();
+  const [session, authError] = await requireSession();
   if (authError) return authError;
 
   const { providerId } = await params;
@@ -30,7 +31,18 @@ export async function POST(
   }
 
   try { const adapter = await getStorageAdapter(providerId);
-  
+
+  await logAudit({
+    action: "FILE_ZIP_DOWNLOAD",
+    description: `ZIP 下载 ${keys.length} 个文件 (${bucket})`,
+    userId: session.user.id,
+    username: session.user.name || "unknown",
+    providerId,
+    bucket,
+    req,
+    metadata: { fileCount: keys.length },
+  });
+
   const passthrough = new PassThrough();
   const archive = archiver("zip", { zlib: { level: 5 } });
   

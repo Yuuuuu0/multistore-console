@@ -14,6 +14,20 @@ import {
   type Provider,
   type S3Object,
 } from "../lib/file-utils";
+import {
+  createUploadQueue,
+  readEntriesFromDataTransfer,
+  buildUploadTasks,
+  type UploadProgress,
+} from "../lib/upload-queue";
+import {
+  createMultipartUploader,
+  getResumeInfo,
+  clearResumeInfo,
+  cleanupExpiredResumes,
+  type MultipartUploadState,
+  type ResumeInfo,
+} from "../lib/multipart-upload";
 
 export function useFileBrowser() {
   const { data: session } = useSession();
@@ -30,7 +44,12 @@ export function useFileBrowser() {
   const [currentPrefix, setCurrentPrefix] = useState("");
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0, fileName: "" });
+  const [uploadProgress, setUploadProgress] = useState<UploadProgress>({
+    completed: 0,
+    failed: 0,
+    total: 0,
+    currentFiles: [],
+  });
 
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [clipboard, setClipboard] = useState<ClipboardItem | null>(null);
@@ -58,6 +77,14 @@ export function useFileBrowser() {
   const [dragOver, setDragOver] = useState(false);
   const dragCounter = useRef(0);
 
+  // Multipart upload state
+  const [multipartState, setMultipartState] = useState<MultipartUploadState | null>(null);
+  const [resumeDialogOpen, setResumeDialogOpen] = useState(false);
+  const [pendingResumeInfo, setPendingResumeInfo] = useState<ResumeInfo | null>(null);
+  const [pendingResumeFile, setPendingResumeFile] = useState<File | null>(null);
+  const [pendingResumeKey, setPendingResumeKey] = useState<string>("");
+  const multipartUploaderRef = useRef<ReturnType<typeof createMultipartUploader> | null>(null);
+
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingProvider, setEditingProvider] = useState<Provider | null>(null);
   const [formData, setFormData] = useState<ProviderFormData>({
@@ -71,6 +98,14 @@ export function useFileBrowser() {
   const [availableBuckets, setAvailableBuckets] = useState<string[]>([]);
   const [selectedBuckets, setSelectedBuckets] = useState<string[]>([]);
   const [testingConnection, setTestingConnection] = useState(false);
+
+  // Refs for upload queue access to latest state
+  const selectedProviderRef = useRef(selectedProvider);
+  const selectedBucketRef = useRef(selectedBucket);
+  const currentPrefixRef = useRef(currentPrefix);
+  selectedProviderRef.current = selectedProvider;
+  selectedBucketRef.current = selectedBucket;
+  currentPrefixRef.current = currentPrefix;
 
   const breadcrumbParts = currentPrefix ? currentPrefix.split("/").filter(Boolean) : [];
   const breadcrumbs: BreadcrumbItem[] = breadcrumbParts.map((label, index) => ({
@@ -89,6 +124,7 @@ export function useFileBrowser() {
 
   useEffect(() => {
     loadProviders();
+    cleanupExpiredResumes();
   }, []);
 
   useEffect(() => {
@@ -287,35 +323,152 @@ export function useFileBrowser() {
     }
   }
 
-  async function uploadFiles(files: FileList | File[]) {
+  // ---- 并行上传引擎 ----
+  const MULTIPART_THRESHOLD = 100 * 1024 * 1024; // 100MB
+
+  function startUpload(tasks: { file: File; key: string }[]) {
+    const provider = selectedProviderRef.current;
+    const bucket = selectedBucketRef.current;
+    if (!provider || !bucket || tasks.length === 0) return;
+
+    // Separate small files (<100MB) and large files (>=100MB)
+    const smallTasks = tasks.filter((t) => t.file.size < MULTIPART_THRESHOLD);
+    const largeTasks = tasks.filter((t) => t.file.size >= MULTIPART_THRESHOLD);
+
+    // Upload small files via existing queue
+    if (smallTasks.length > 0) {
+      setUploading(true);
+      const queue = createUploadQueue({
+        concurrency: 4,
+        providerId: provider.id,
+        bucket,
+        onProgress: (progress) => {
+          setUploadProgress(progress);
+        },
+        onComplete: (result) => {
+          setUploading(false);
+          setUploadProgress({ completed: 0, failed: 0, total: 0, currentFiles: [] });
+          if (result.ok > 0) {
+            toast.success(`成功上传 ${result.ok} 个文件`);
+            const curBucket = selectedBucketRef.current;
+            const curPrefix = currentPrefixRef.current;
+            if (curBucket) loadObjects(curBucket, curPrefix);
+          }
+          if (result.fail > 0) {
+            toast.error(`${result.fail} 个文件上传失败`);
+          }
+        },
+      });
+      queue.addTasks(smallTasks);
+      queue.start();
+    }
+
+    // Upload large files via multipart (one at a time)
+    if (largeTasks.length > 0) {
+      startMultipartUploadChain(largeTasks, 0);
+    }
+  }
+
+  function startMultipartUploadChain(tasks: { file: File; key: string }[], index: number) {
+    if (index >= tasks.length) return;
+    const task = tasks[index];
+    const provider = selectedProviderRef.current;
+    const bucket = selectedBucketRef.current;
+    if (!provider || !bucket) return;
+
+    // Check for resume info
+    const resume = getResumeInfo(provider.id, bucket, task.file);
+    if (resume) {
+      setPendingResumeInfo(resume);
+      setPendingResumeFile(task.file);
+      setPendingResumeKey(task.key);
+      setResumeDialogOpen(true);
+      return;
+    }
+
+    doStartMultipartUpload(task.file, task.key, undefined, tasks, index);
+  }
+
+  function doStartMultipartUpload(
+    file: File,
+    key: string,
+    resumeInfo: ResumeInfo | undefined,
+    chain?: { file: File; key: string }[],
+    chainIndex?: number
+  ) {
+    const provider = selectedProviderRef.current;
+    const bucket = selectedBucketRef.current;
+    if (!provider || !bucket) return;
+
+    const uploader = createMultipartUploader({
+      file,
+      providerId: provider.id,
+      bucket,
+      key,
+      concurrency: 3,
+      onProgress: (state) => {
+        setMultipartState({ ...state });
+      },
+      onComplete: () => {
+        setMultipartState(null);
+        multipartUploaderRef.current = null;
+        toast.success(`大文件上传完成: ${file.name}`);
+        const curBucket = selectedBucketRef.current;
+        const curPrefix = currentPrefixRef.current;
+        if (curBucket) loadObjects(curBucket, curPrefix);
+        // Continue chain if more large files
+        if (chain && chainIndex !== undefined) {
+          startMultipartUploadChain(chain, chainIndex + 1);
+        }
+      },
+      onError: (error) => {
+        multipartUploaderRef.current = null;
+        toast.error(`大文件上传失败: ${error}`);
+      },
+    });
+
+    multipartUploaderRef.current = uploader;
+
+    if (resumeInfo) {
+      uploader.resume(resumeInfo);
+    } else {
+      uploader.start();
+    }
+  }
+
+  function handleResumeUpload() {
+    setResumeDialogOpen(false);
+    if (pendingResumeFile && pendingResumeInfo) {
+      doStartMultipartUpload(pendingResumeFile, pendingResumeKey, pendingResumeInfo);
+    }
+    setPendingResumeInfo(null);
+    setPendingResumeFile(null);
+    setPendingResumeKey("");
+  }
+
+  function handleRestartUpload() {
+    setResumeDialogOpen(false);
+    if (pendingResumeInfo) {
+      clearResumeInfo(pendingResumeInfo.providerId, pendingResumeInfo.bucket, pendingResumeInfo.fileId);
+    }
+    if (pendingResumeFile) {
+      doStartMultipartUpload(pendingResumeFile, pendingResumeKey, undefined);
+    }
+    setPendingResumeInfo(null);
+    setPendingResumeFile(null);
+    setPendingResumeKey("");
+  }
+
+  function cancelMultipartUpload() {
+    multipartUploaderRef.current?.cancel();
+    setMultipartState(null);
+    multipartUploaderRef.current = null;
+  }
+
+  function uploadFiles(files: FileList | File[]) {
     if (!selectedProvider || !selectedBucket) return;
-    const fileArr = Array.from(files);
-    setUploading(true);
-    let ok = 0;
-    let fail = 0;
-    for (let i = 0; i < fileArr.length; i++) {
-      const file = fileArr[i];
-      setUploadProgress({ current: i + 1, total: fileArr.length, fileName: file.name });
-      try {
-        const key = currentPrefix + file.name;
-        const params = new URLSearchParams({ bucket: selectedBucket, key });
-        const res = await fetch(`/api/fs/${selectedProvider.id}/upload?${params}`, {
-          method: "POST",
-          body: file,
-          headers: { "Content-Type": file.type || "application/octet-stream" },
-        });
-        res.ok ? ok++ : fail++;
-      } catch {
-        fail++;
-      }
-    }
-    setUploading(false);
-    setUploadProgress({ current: 0, total: 0, fileName: "" });
-    if (ok > 0) {
-      toast.success(`成功上传 ${ok} 个文件`);
-      loadObjects(selectedBucket, currentPrefix);
-    }
-    if (fail > 0) toast.error(`${fail} 个文件上传失败`);
+    const tasks = buildUploadTasks(files, currentPrefix);
+    startUpload(tasks);
   }
 
   function handleUploadClick() {
@@ -323,6 +476,19 @@ export function useFileBrowser() {
     const input = document.createElement("input");
     input.type = "file";
     input.multiple = true;
+    input.onchange = (e) => {
+      const files = (e.target as HTMLInputElement).files;
+      if (files && files.length > 0) uploadFiles(files);
+    };
+    input.click();
+  }
+
+  function handleFolderUploadClick() {
+    if (!selectedProvider || !selectedBucket) return;
+    const input = document.createElement("input");
+    input.type = "file";
+    input.multiple = true;
+    input.setAttribute("webkitdirectory", "");
     input.onchange = (e) => {
       const files = (e.target as HTMLInputElement).files;
       if (files && files.length > 0) uploadFiles(files);
@@ -350,16 +516,36 @@ export function useFileBrowser() {
   }, []);
 
   const handleDrop = useCallback(
-    (e: DragEvent) => {
+    async (e: DragEvent) => {
       e.preventDefault();
       e.stopPropagation();
       dragCounter.current = 0;
       setDragOver(false);
-      if (e.dataTransfer.files.length > 0 && selectedProvider && selectedBucket) {
-        uploadFiles(e.dataTransfer.files);
+
+      const provider = selectedProviderRef.current;
+      const bucket = selectedBucketRef.current;
+      const prefix = currentPrefixRef.current;
+      if (!provider || !bucket) return;
+
+      // 尝试用 webkitGetAsEntry 递归读取（支持文件夹）
+      if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+        const firstItem = e.dataTransfer.items[0];
+        if (firstItem && typeof firstItem.webkitGetAsEntry === "function") {
+          const tasks = await readEntriesFromDataTransfer(e.dataTransfer.items, prefix);
+          if (tasks.length > 0) {
+            startUpload(tasks);
+            return;
+          }
+        }
+      }
+
+      // Fallback: 普通文件拖拽
+      if (e.dataTransfer.files.length > 0) {
+        const tasks = buildUploadTasks(e.dataTransfer.files, prefix);
+        startUpload(tasks);
       }
     },
-    [selectedProvider, selectedBucket, currentPrefix],
+    [],
   );
 
   function openRenameDialog(key: string) {
@@ -693,13 +879,16 @@ export function useFileBrowser() {
     formData,
     loading,
     loadingMore,
+    multipartState,
     nextToken,
     objects,
+    pendingResumeInfo,
     preview,
     previewFileName,
     providers,
     renameDialogOpen,
     renameValue,
+    resumeDialogOpen,
     searchQuery,
     selectedBucket,
     selectedBuckets,
@@ -715,6 +904,7 @@ export function useFileBrowser() {
     transferring,
     uploading,
     uploadProgress,
+    cancelMultipartUpload,
     handleBatchDelete,
     handleBatchDownload,
     handleBreadcrumbClick,
@@ -730,10 +920,13 @@ export function useFileBrowser() {
     handleDragOver,
     handleDrop,
     handleFolderClick,
+    handleFolderUploadClick,
     handleLoadMore,
     handlePaste,
     handleProviderSelect,
     handleRename,
+    handleRestartUpload,
+    handleResumeUpload,
     handleSubmit,
     handleTestConnection,
     handleTransfer,
@@ -751,6 +944,7 @@ export function useFileBrowser() {
     setPreview,
     setRenameDialogOpen,
     setRenameValue,
+    setResumeDialogOpen,
     setSearchQuery,
     setTransferDialogOpen,
     setTransferDstBucket,

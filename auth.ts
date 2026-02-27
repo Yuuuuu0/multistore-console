@@ -5,6 +5,7 @@ import GitHubProvider from "next-auth/providers/github";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
 import { decrypt } from "@/lib/crypto";
+import { logAudit } from "@/lib/audit";
 
 async function getGitHubCredentials(): Promise<{ clientId: string; clientSecret: string } | null> {
   const [idRow, secretRow] = await Promise.all([
@@ -88,6 +89,17 @@ export async function buildAuthOptions(): Promise<NextAuthOptions> {
     session: { strategy: "jwt" },
     providers,
     callbacks: {
+      async signIn({ user }) {
+        if (user?.id) {
+          await logAudit({
+            action: "AUTH_LOGIN",
+            description: `用户 ${user.name || "unknown"} 登录`,
+            userId: user.id,
+            username: user.name || "unknown",
+          });
+        }
+        return true;
+      },
       async jwt({ token, user }) {
         if (user) {
           token.userId = user.id;

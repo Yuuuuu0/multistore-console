@@ -1,4 +1,5 @@
 import { requireSession } from "@/lib/api-auth";
+import { logAudit } from "@/lib/audit";
 import { checkRateLimit, RATE_LIMIT_PRESETS } from "@/lib/rate-limit";
 import { prisma } from "@/lib/db";
 import bcrypt from "bcryptjs";
@@ -47,6 +48,14 @@ export async function PUT(req: Request) {
   await prisma.user.update({
     where: { id: user.id },
     data: { passwordHash, requirePasswordChange: false },
+  });
+
+  await logAudit({
+    action: "AUTH_PASSWORD_CHANGE",
+    description: `修改密码`,
+    userId: session.user.id,
+    username: session.user.name || "unknown",
+    req,
   });
 
   return NextResponse.json({ ok: true });

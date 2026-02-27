@@ -1,4 +1,5 @@
 import { requireSession } from "@/lib/api-auth";
+import { logAudit } from "@/lib/audit";
 import { checkRateLimit, RATE_LIMIT_PRESETS } from "@/lib/rate-limit";
 import { toErrorMessage } from "@/lib/errors";
 import { S3Client } from "@aws-sdk/client-s3";
@@ -7,7 +8,7 @@ import { checkEndpoint } from "@/lib/url-validator";
 import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
-  const [, authError] = await requireSession();
+  const [session, authError] = await requireSession();
   if (authError) return authError;
 
   const limited = checkRateLimit(req, "test-connection", RATE_LIMIT_PRESETS.sensitive);
@@ -62,6 +63,15 @@ export async function POST(req: Request) {
   const adapter = new StorageAdapter(client);
   const buckets = await adapter.listBuckets();
   
+  await logAudit({
+    action: "PROVIDER_TEST_CONNECTION",
+    description: `测试连接 (${type}, ${endpoint || 'default'})`,
+    userId: session.user.id,
+    username: session.user.name || "unknown",
+    req,
+    metadata: { type, endpoint },
+  });
+
   return NextResponse.json({ buckets }); } catch (e: unknown) { console.error("[test-connection] 错误:", e);
   return NextResponse.json({ error: toErrorMessage(e) || "连接测试失败" }, { status: 500 }); }
 }

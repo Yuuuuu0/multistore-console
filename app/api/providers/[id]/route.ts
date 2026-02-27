@@ -1,11 +1,12 @@
 import { requireSession } from "@/lib/api-auth";
+import { logAudit } from "@/lib/audit";
 import { prisma } from "@/lib/db";
 import { encrypt } from "@/lib/crypto";
 import { checkEndpoint } from "@/lib/url-validator";
 import { NextResponse } from "next/server";
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const [, authError] = await requireSession();
+  const [session, authError] = await requireSession();
   if (authError) return authError;
 
   const { id } = await params;
@@ -36,14 +37,35 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   }
 
   await prisma.provider.update({ where: { id }, data });
+
+  await logAudit({
+    action: "PROVIDER_UPDATE",
+    description: `更新存储商 ${name || id}`,
+    userId: session.user.id,
+    username: session.user.name || "unknown",
+    providerId: id,
+    providerName: name,
+    req,
+  });
+
   return NextResponse.json({ ok: true });
 }
 
-export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const [, authError] = await requireSession();
+export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const [session, authError] = await requireSession();
   if (authError) return authError;
 
   const { id } = await params;
   await prisma.provider.delete({ where: { id } });
+
+  await logAudit({
+    action: "PROVIDER_DELETE",
+    description: `删除存储商 ${id}`,
+    userId: session.user.id,
+    username: session.user.name || "unknown",
+    providerId: id,
+    req,
+  });
+
   return NextResponse.json({ ok: true });
 }

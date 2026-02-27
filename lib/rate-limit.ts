@@ -25,8 +25,10 @@ export const RATE_LIMIT_PRESETS = {
   sensitive: { max: 10, windowMs: 60 * 1000 },
   /** 一般 API 操作：100 次/分钟 */
   general: { max: 100, windowMs: 60 * 1000 },
-  /** 文件上传：20 次/分钟 */
-  upload: { max: 20, windowMs: 60 * 1000 },
+  /** 文件上传（并发上传友好）：120 次/分钟 */
+  upload: { max: 120, windowMs: 60 * 1000 },
+  /** 传输任务查询（轮询友好）：60 次/分钟 */
+  transferRead: { max: 60, windowMs: 60 * 1000 },
 } as const;
 
 const stores = new Map<string, Map<string, RateLimitEntry>>();

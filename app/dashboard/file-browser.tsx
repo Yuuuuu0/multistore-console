@@ -1,14 +1,25 @@
 "use client";
 
 import Link from "next/link";
-import { AlertTriangle, Upload } from "lucide-react";
+import { AlertTriangle, ClipboardPaste, FolderPlus, RefreshCw, Upload } from "lucide-react";
+
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 
 import { BreadcrumbNav } from "./components/breadcrumb-nav";
 import { FileList } from "./components/file-list";
+import { FileListSkeleton } from "./components/file-list-skeleton";
 import { FolderDialog } from "./components/folder-dialog";
 import { PreviewDialog } from "./components/preview-dialog";
 import { ProviderDialog } from "./components/provider-dialog";
+import { ProviderList } from "./components/provider-list";
 import { RenameDialog } from "./components/rename-dialog";
+import { ResumeUploadDialog } from "./components/resume-upload-dialog";
 import { Sidebar } from "./components/sidebar";
 import { Toolbar } from "./components/toolbar";
 import { TransferDialog } from "./components/transfer-dialog";
@@ -16,6 +27,50 @@ import { useFileBrowser } from "./hooks/use-file-browser";
 
 export function FileBrowser() {
   const browser = useFileBrowser();
+
+  const blankAreaContent = (
+    <>
+      {!browser.selectedProvider ? (
+        <div className="text-center text-muted-foreground py-12">请从左侧选择存储商</div>
+      ) : !browser.selectedBucket ? (
+        <div className="text-center text-muted-foreground py-12">请选择存储桶</div>
+      ) : browser.loading ? (
+        <FileListSkeleton />
+      ) : browser.objects.length === 0 ? (
+        <div className="text-center text-muted-foreground py-12">
+          <p>此目录为空</p>
+          <p className="text-xs mt-2">拖放文件到此处上传</p>
+        </div>
+      ) : browser.filteredObjects.length === 0 ? (
+        <div className="text-center text-muted-foreground py-12">
+          <p>没有匹配的文件</p>
+        </div>
+      ) : (
+        <FileList
+          objects={browser.filteredObjects}
+          selectedKeys={browser.selectedKeys}
+          prefix={browser.currentPrefix}
+          providers={browser.providers}
+          allSelected={browser.allSelected}
+          selectedProvider={browser.selectedProvider}
+          selectedBucket={browser.selectedBucket}
+          nextToken={browser.nextToken}
+          loadingMore={browser.loadingMore}
+          onToggleSelect={browser.toggleSelect}
+          onToggleSelectAll={browser.toggleSelectAll}
+          onFolderClick={browser.handleFolderClick}
+          onDownload={browser.handleDownload}
+          onDelete={browser.handleDeleteFile}
+          onRename={browser.openRenameDialog}
+          onCopy={browser.handleCopy}
+          onCut={browser.handleCut}
+          onPreview={browser.openPreview}
+          onOpenTransfer={browser.openTransferDialog}
+          onLoadMore={browser.handleLoadMore}
+        />
+      )}
+    </>
+  );
 
   return (
     <div
@@ -25,17 +80,19 @@ export function FileBrowser() {
       onDragOver={browser.handleDragOver}
       onDrop={browser.handleDrop}
     >
-      <Sidebar
-        providers={browser.providers}
-        selectedProvider={browser.selectedProvider}
-        selectedBucket={browser.selectedBucket}
-        buckets={browser.buckets}
-        onProviderSelect={browser.handleProviderSelect}
-        onBucketSelect={browser.handleBucketSelect}
-        onAddProvider={browser.openAddDialog}
-        onEditProvider={browser.openEditDialog}
-        onDeleteProvider={browser.handleDeleteProvider}
-      />
+      <Sidebar>
+        <ProviderList
+          providers={browser.providers}
+          selectedProvider={browser.selectedProvider}
+          selectedBucket={browser.selectedBucket}
+          buckets={browser.buckets}
+          onProviderSelect={browser.handleProviderSelect}
+          onBucketSelect={browser.handleBucketSelect}
+          onAddProvider={browser.openAddDialog}
+          onEditProvider={browser.openEditDialog}
+          onDeleteProvider={browser.handleDeleteProvider}
+        />
+      </Sidebar>
 
       <div className="flex-1 flex flex-col overflow-hidden relative">
         {browser.showSecurityBanner && (
@@ -74,9 +131,11 @@ export function FileBrowser() {
           uploadProgress={browser.uploadProgress}
           isLoading={browser.loading}
           isUploading={browser.uploading}
+          multipartState={browser.multipartState}
           onToggleSelectAll={browser.toggleSelectAll}
           onRefresh={() => browser.selectedBucket && browser.loadObjects(browser.selectedBucket, browser.currentPrefix)}
           onUploadClick={browser.handleUploadClick}
+          onFolderUploadClick={browser.handleFolderUploadClick}
           onBatchDelete={browser.handleBatchDelete}
           onBatchDownload={browser.handleBatchDownload}
           onPaste={browser.handlePaste}
@@ -85,6 +144,7 @@ export function FileBrowser() {
             browser.setFolderDialogOpen(true);
           }}
           onSearchChange={browser.setSearchQuery}
+          onCancelMultipart={browser.cancelMultipartUpload}
         />
 
         <BreadcrumbNav
@@ -93,47 +153,46 @@ export function FileBrowser() {
           onBreadcrumbClick={browser.handleBreadcrumbClick}
         />
 
-        <div className="flex-1 overflow-auto">
-          {!browser.selectedProvider ? (
-            <div className="text-center text-muted-foreground py-12">请从左侧选择存储商</div>
-          ) : !browser.selectedBucket ? (
-            <div className="text-center text-muted-foreground py-12">请选择存储桶</div>
-          ) : browser.loading ? (
-            <div className="text-center text-muted-foreground py-12">加载中...</div>
-          ) : browser.objects.length === 0 ? (
-            <div className="text-center text-muted-foreground py-12">
-              <p>此目录为空</p>
-              <p className="text-xs mt-2">拖放文件到此处上传</p>
-            </div>
-          ) : browser.filteredObjects.length === 0 ? (
-            <div className="text-center text-muted-foreground py-12">
-              <p>没有匹配的文件</p>
-            </div>
-          ) : (
-            <FileList
-              objects={browser.filteredObjects}
-              selectedKeys={browser.selectedKeys}
-              prefix={browser.currentPrefix}
-              providers={browser.providers}
-              allSelected={browser.allSelected}
-              selectedProvider={browser.selectedProvider}
-              selectedBucket={browser.selectedBucket}
-              nextToken={browser.nextToken}
-              loadingMore={browser.loadingMore}
-              onToggleSelect={browser.toggleSelect}
-              onToggleSelectAll={browser.toggleSelectAll}
-              onFolderClick={browser.handleFolderClick}
-              onDownload={browser.handleDownload}
-              onDelete={browser.handleDeleteFile}
-              onRename={browser.openRenameDialog}
-              onCopy={browser.handleCopy}
-              onCut={browser.handleCut}
-              onPreview={browser.openPreview}
-              onOpenTransfer={browser.openTransferDialog}
-              onLoadMore={browser.handleLoadMore}
-            />
-          )}
-        </div>
+        {browser.selectedBucket ? (
+          <ContextMenu>
+            <ContextMenuTrigger asChild>
+              <div className="flex-1 overflow-auto">
+                {blankAreaContent}
+              </div>
+            </ContextMenuTrigger>
+            <ContextMenuContent>
+              <ContextMenuItem onClick={browser.handleUploadClick}>
+                <Upload className="w-4 h-4 mr-2" />上传文件
+              </ContextMenuItem>
+              <ContextMenuItem onClick={browser.handleFolderUploadClick}>
+                <Upload className="w-4 h-4 mr-2" />上传文件夹
+              </ContextMenuItem>
+              <ContextMenuItem onClick={() => {
+                browser.setFolderName("");
+                browser.setFolderDialogOpen(true);
+              }}>
+                <FolderPlus className="w-4 h-4 mr-2" />新建文件夹
+              </ContextMenuItem>
+              {browser.clipboard && (
+                <>
+                  <ContextMenuSeparator />
+                  <ContextMenuItem onClick={browser.handlePaste}>
+                    <ClipboardPaste className="w-4 h-4 mr-2" />
+                    粘贴{browser.clipboard.action === "cut" ? "(移动)" : "(复制)"}
+                  </ContextMenuItem>
+                </>
+              )}
+              <ContextMenuSeparator />
+              <ContextMenuItem onClick={() => browser.selectedBucket && browser.loadObjects(browser.selectedBucket, browser.currentPrefix)}>
+                <RefreshCw className="w-4 h-4 mr-2" />刷新
+              </ContextMenuItem>
+            </ContextMenuContent>
+          </ContextMenu>
+        ) : (
+          <div className="flex-1 overflow-auto">
+            {blankAreaContent}
+          </div>
+        )}
       </div>
 
       <PreviewDialog
@@ -181,6 +240,13 @@ export function FileBrowser() {
         onTestConnection={browser.handleTestConnection}
         onFormDataChange={browser.setFormData}
         onToggleBucket={browser.toggleBucket}
+      />
+      <ResumeUploadDialog
+        open={browser.resumeDialogOpen}
+        resumeInfo={browser.pendingResumeInfo}
+        onResume={browser.handleResumeUpload}
+        onRestart={browser.handleRestartUpload}
+        onClose={() => browser.setResumeDialogOpen(false)}
       />
     </div>
   );

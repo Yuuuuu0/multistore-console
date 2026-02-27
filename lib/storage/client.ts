@@ -1,4 +1,5 @@
 import { S3Client } from "@aws-sdk/client-s3";
+import { createHash } from "crypto";
 import { decrypt } from "@/lib/crypto";
 
 export type ProviderConfig = {
@@ -30,6 +31,19 @@ export function createS3Client(config: ProviderConfig): S3Client {
       secretAccessKey: decrypt(config.secretAccessKey),
     },
   });
+
+  // 为带 body 的请求自动添加 Content-MD5（OSS 等厂商对 DeleteObjects 强制要求）
+  client.middlewareStack.add(
+    (next) => async (args) => {
+      const req = args.request as { body?: string | Uint8Array; headers?: Record<string, string> };
+      if (req?.body && req.headers && !req.headers["content-md5"]) {
+        const body = typeof req.body === "string" ? Buffer.from(req.body) : req.body;
+        req.headers["content-md5"] = createHash("md5").update(body).digest("base64");
+      }
+      return next(args);
+    },
+    { step: "finalizeRequest", name: "addContentMD5" }
+  );
 
   // 部分 S3 兼容厂商（如 OSS）不支持 aws-chunked；通过 guard 防止误发该类请求
   if (config.disableChunked) {

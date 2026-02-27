@@ -1,10 +1,11 @@
 import { requireSession } from "@/lib/api-auth";
+import { logAudit } from "@/lib/audit";
 import { getStorageAdapter } from "@/lib/storage";
 import { toErrorMessage } from "@/lib/errors";
 import { NextResponse } from "next/server";
 
 export async function GET(req: Request, { params }: { params: Promise<{ providerId: string }> }) {
-  const [, authError] = await requireSession();
+  const [session, authError] = await requireSession();
   if (authError) return authError;
 
   const { providerId } = await params;
@@ -16,5 +17,16 @@ export async function GET(req: Request, { params }: { params: Promise<{ provider
 
   try { const adapter = await getStorageAdapter(providerId);
   const url = await adapter.getPresignedUrl(bucket, key, 3600, download);
+  if (download) {
+    await logAudit({
+      action: "FILE_DOWNLOAD",
+      description: `下载文件 ${key} (${bucket})`,
+      userId: session.user.id,
+      username: session.user.name || "unknown",
+      providerId,
+      bucket,
+      req,
+    });
+  }
   return NextResponse.json({ url }); } catch (e: unknown) { return NextResponse.json({ error: toErrorMessage(e) }, { status: 500 }); }
 }
