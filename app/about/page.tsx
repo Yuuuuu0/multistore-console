@@ -31,7 +31,7 @@ export default function AboutPage() {
             <dl className="space-y-2 text-sm">
               <div className="flex">
                 <dt className="w-24 text-muted-foreground flex-shrink-0">版本</dt>
-                <dd>0.1.0</dd>
+                <dd>1.0.0</dd>
               </div>
               <div className="flex">
                 <dt className="w-24 text-muted-foreground flex-shrink-0">许可证</dt>
