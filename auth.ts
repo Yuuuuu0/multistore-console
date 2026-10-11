@@ -54,6 +54,8 @@ export async function buildAuthOptions(): Promise<NextAuthOptions> {
       GitHubProvider({
         clientId: ghCreds.clientId,
         clientSecret: ghCreds.clientSecret,
+        // 校验 GitHub OAuth 回调新增的 iss 参数（RFC 9207）。
+        issuer: "https://github.com/login/oauth",
         async profile(profile) {
           const whitelist = await prisma.appConfig.findUnique({
             where: { key: "github_whitelist" },
