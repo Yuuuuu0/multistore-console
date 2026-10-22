@@ -44,7 +44,7 @@
 
 ### 环境要求
 
-- Node.js 18+
+- Node.js 24+（Node 20 已于 2026-04-30 EOL，不再接收安全补丁）
 - npm / pnpm / yarn
 
 ### 本地开发

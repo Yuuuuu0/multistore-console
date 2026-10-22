@@ -1,4 +1,7 @@
-FROM node:20-alpine AS base
+# Node.js 24 LTS (Krypton) on Alpine 3.24, pinned to an exact tag on purpose:
+# floating tags would silently drift the runtime again. Node 20 reached EOL on
+# 2026-04-30 and no longer receives security patches.
+FROM node:24.22.1-alpine3.24 AS base
 
 # ── Dependencies ──
 FROM base AS deps
