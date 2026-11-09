@@ -5,10 +5,12 @@ import { toast } from "sonner";
 import {
   AlertCircle,
   ArrowRight,
+  ArrowRightLeft,
   CheckCircle2,
   Clock,
   Loader2,
   Play,
+  RefreshCw,
   Trash2,
   XCircle,
 } from "lucide-react";
@@ -31,13 +33,22 @@ type TransferTask = {
   updatedAt: string;
 };
 
-type StatusFilter = "ALL" | "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
+type StatusFilter =
+  | "ALL"
+  | "QUEUED"
+  | "RUNNING"
+  | "SUCCEEDED"
+  | "FAILED"
+  | "CANCELLED";
 
-const STATUS_CONFIG: Record<TransferTask["status"], {
-  label: string;
-  variant: "default" | "secondary" | "destructive" | "outline";
-  icon: typeof CheckCircle2;
-}> = {
+const STATUS_CONFIG: Record<
+  TransferTask["status"],
+  {
+    label: string;
+    variant: "default" | "secondary" | "destructive" | "outline";
+    icon: typeof CheckCircle2;
+  }
+> = {
   QUEUED: { label: "排队中", variant: "secondary", icon: Clock },
   RUNNING: { label: "传输中", variant: "default", icon: Play },
   SUCCEEDED: { label: "成功", variant: "outline", icon: CheckCircle2 },
@@ -54,6 +65,9 @@ const FILTERS: { value: StatusFilter; label: string }[] = [
   { value: "CANCELLED", label: "已取消" },
 ];
 
+/**
+ * 跨云异步流转任务监控列表组件
+ */
 export function TransferList() {
   const [tasks, setTasks] = useState<TransferTask[]>([]);
   const [loading, setLoading] = useState(true);
@@ -61,29 +75,31 @@ export function TransferList() {
   const [expandedError, setExpandedError] = useState<string | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const fetchTasks = useCallback(async (showLoading = false) => {
-    if (showLoading) setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (filter !== "ALL") params.set("status", filter);
-      params.set("take", "100");
-      const res = await fetch(`/api/transfers?${params}`);
-      if (res.ok) {
-        const data = await res.json();
-        setTasks(data.items || []);
+  const fetchTasks = useCallback(
+    async (showLoading = false) => {
+      if (showLoading) setLoading(true);
+      try {
+        const params = new URLSearchParams();
+        if (filter !== "ALL") params.set("status", filter);
+        params.set("take", "100");
+        const res = await fetch(`/api/transfers?${params}`);
+        if (res.ok) {
+          const data = await res.json();
+          setTasks(data.items || []);
+        }
+      } catch {
+        // 静默失败，不打断轮询
+      } finally {
+        if (showLoading) setLoading(false);
       }
-    } catch {
-      // 静默失败，不打断轮询
-    } finally {
-      if (showLoading) setLoading(false);
-    }
-  }, [filter]);
+    },
+    [filter],
+  );
 
   useEffect(() => {
     fetchTasks(true);
   }, [fetchTasks]);
 
-  // 自动刷新：5 秒轮询，仅页面可见时
   useEffect(() => {
     function startPolling() {
       stopPolling();
@@ -123,141 +139,198 @@ export function TransferList() {
   }
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
-      <div className="h-[57px] border-b px-6 flex items-center flex-shrink-0">
-        <h1 className="text-lg font-semibold">传输任务</h1>
+    <div className="flex-1 flex flex-col overflow-hidden bg-architectural-grid">
+      <div className="h-14 border-b bg-card/70 backdrop-blur px-4 sm:px-6 flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-2.5">
+          <ArrowRightLeft className="w-4 h-4 text-primary" />
+          <h1 className="text-base sm:text-lg font-semibold tracking-tight">
+            传输任务
+          </h1>
+          <Badge variant="outline" className="font-mono text-[10px] hidden sm:inline-flex">
+            AUTO-POLL // 5S
+          </Badge>
+        </div>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => fetchTasks(false)}
+          className="h-8 text-xs"
+        >
+          <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
+          刷新
+        </Button>
       </div>
 
       {/* 状态筛选 */}
-      <div className="border-b px-6 py-3 flex items-center gap-2 flex-shrink-0">
+      <div className="border-b bg-muted/20 px-4 sm:px-6 py-2.5 flex items-center gap-1.5 overflow-x-auto shrink-0">
         {FILTERS.map((f) => (
           <Button
             key={f.value}
             size="sm"
             variant={filter === f.value ? "default" : "outline"}
             onClick={() => setFilter(f.value)}
-            className="h-7 text-xs"
+            className="h-7 text-xs shrink-0"
           >
             {f.label}
           </Button>
         ))}
-        <div className="flex-1" />
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => fetchTasks(false)}
-          className="h-7 text-xs"
-        >
-          刷新
-        </Button>
       </div>
 
       {/* 任务列表 */}
       <div className="flex-1 overflow-auto">
         {loading ? (
-          <div className="flex items-center justify-center py-12 text-muted-foreground">
-            <Loader2 className="w-5 h-5 animate-spin mr-2" />加载中...
+          <div className="flex items-center justify-center py-16 text-muted-foreground text-sm">
+            <Loader2 className="w-5 h-5 animate-spin mr-2 text-primary" />
+            加载中...
           </div>
         ) : tasks.length === 0 ? (
-          <div className="text-center text-muted-foreground py-12">
-            暂无传输任务
+          <div className="p-12 text-center space-y-2 text-muted-foreground">
+            <ArrowRightLeft className="w-8 h-8 mx-auto opacity-50" />
+            <p className="text-sm font-medium text-foreground">暂无传输任务</p>
+            <p className="text-xs">
+              在「文件浏览」中右键点击文件选择「跨云传输」即可创建后台流转任务
+            </p>
           </div>
         ) : (
-          <table className="w-full text-sm">
-            <thead className="border-b sticky top-0 bg-background">
-              <tr>
-                <th className="px-6 py-3 text-left font-medium text-muted-foreground">源文件</th>
-                <th className="px-2 py-3 w-8"></th>
-                <th className="px-6 py-3 text-left font-medium text-muted-foreground">目标</th>
-                <th className="px-6 py-3 text-center font-medium text-muted-foreground w-24">状态</th>
-                <th className="px-6 py-3 text-center font-medium text-muted-foreground w-28">进度</th>
-                <th className="px-6 py-3 text-right font-medium text-muted-foreground w-40">创建时间</th>
-                <th className="px-6 py-3 w-20"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {tasks.map((task) => {
-                const config = STATUS_CONFIG[task.status];
-                const StatusIcon = config.icon;
-                const srcFile = task.srcKey.split("/").pop() || task.srcKey;
-                const dstFile = task.dstKey.split("/").pop() || task.dstKey;
-                return (
-                  <tr key={task.id} className="border-b hover:bg-muted/50">
-                    <td className="px-6 py-3">
-                      <div className="truncate max-w-xs" title={`${task.srcBucket}/${task.srcKey}`}>
-                        <span className="text-muted-foreground text-xs">{task.srcBucket}/</span>
-                        {srcFile}
-                      </div>
-                    </td>
-                    <td className="px-2 py-3">
-                      <ArrowRight className="w-4 h-4 text-muted-foreground" />
-                    </td>
-                    <td className="px-6 py-3">
-                      <div className="truncate max-w-xs" title={`${task.dstBucket}/${task.dstKey}`}>
-                        <span className="text-muted-foreground text-xs">{task.dstBucket}/</span>
-                        {dstFile}
-                      </div>
-                    </td>
-                    <td className="px-6 py-3 text-center">
-                      <Badge variant={config.variant} className="gap-1">
-                        <StatusIcon className="w-3 h-3" />
-                        {config.label}
-                      </Badge>
-                    </td>
-                    <td className="px-6 py-3">
-                      {task.status === "RUNNING" ? (
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-primary rounded-full transition-all"
-                              style={{ width: `${task.progress}%` }}
-                            />
-                          </div>
-                          <span className="text-xs text-muted-foreground w-8">{task.progress}%</span>
-                        </div>
-                      ) : task.status === "FAILED" ? (
-                        <button
-                          className="text-xs text-destructive hover:underline truncate max-w-[120px] block"
-                          title={task.error || ""}
-                          onClick={() => setExpandedError(expandedError === task.id ? null : task.id)}
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs sm:text-sm border-collapse">
+              <thead className="border-b sticky top-0 bg-background/95 backdrop-blur z-10">
+                <tr className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground">
+                  <th className="px-4 sm:px-6 py-3 text-left font-medium">
+                    源文件 // SOURCE
+                  </th>
+                  <th className="px-2 py-3 w-8"></th>
+                  <th className="px-4 sm:px-6 py-3 text-left font-medium">
+                    目标 // DESTINATION
+                  </th>
+                  <th className="px-4 py-3 text-center font-medium w-28">
+                    状态
+                  </th>
+                  <th className="px-4 py-3 text-center font-medium w-32">
+                    进度
+                  </th>
+                  <th className="hidden md:table-cell px-6 py-3 text-right font-medium w-44">
+                    创建时间
+                  </th>
+                  <th className="px-4 sm:px-6 py-3 w-16 text-right">操作</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/60 bg-card/40">
+                {tasks.map((task) => {
+                  const config = STATUS_CONFIG[task.status];
+                  const StatusIcon = config.icon;
+                  const srcFile =
+                    task.srcKey.split("/").pop() || task.srcKey;
+                  const dstFile =
+                    task.dstKey.split("/").pop() || task.dstKey;
+                  return (
+                    <tr
+                      key={task.id}
+                      className="hover:bg-muted/50 transition-colors"
+                    >
+                      <td className="px-4 sm:px-6 py-3">
+                        <div
+                          className="truncate max-w-[180px] sm:max-w-xs font-mono"
+                          title={`${task.srcBucket}/${task.srcKey}`}
                         >
-                          {task.error || "未知错误"}
-                        </button>
-                      ) : task.status === "SUCCEEDED" ? (
-                        <span className="text-xs text-muted-foreground">100%</span>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">--</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-3 text-right text-xs text-muted-foreground">
-                      {new Date(task.createdAt).toLocaleString()}
-                    </td>
-                    <td className="px-6 py-3">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-7 w-7 p-0"
-                        onClick={() => handleDelete(task.id, task.status)}
-                        title={task.status === "QUEUED" || task.status === "RUNNING" ? "取消" : "删除"}
-                      >
-                        {task.status === "QUEUED" || task.status === "RUNNING" ? (
-                          <XCircle className="w-4 h-4" />
+                          <span className="text-muted-foreground text-xs">
+                            {task.srcBucket}/
+                          </span>
+                          <span className="font-medium">{srcFile}</span>
+                        </div>
+                      </td>
+                      <td className="px-2 py-3">
+                        <ArrowRight className="w-4 h-4 text-primary" />
+                      </td>
+                      <td className="px-4 sm:px-6 py-3">
+                        <div
+                          className="truncate max-w-[180px] sm:max-w-xs font-mono"
+                          title={`${task.dstBucket}/${task.dstKey}`}
+                        >
+                          <span className="text-muted-foreground text-xs">
+                            {task.dstBucket}/
+                          </span>
+                          <span className="font-medium">{dstFile}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <Badge variant={config.variant} className="gap-1">
+                          <StatusIcon className="w-3 h-3" />
+                          {config.label}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3">
+                        {task.status === "RUNNING" ? (
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-primary rounded-full transition-all"
+                                style={{ width: `${task.progress}%` }}
+                              />
+                            </div>
+                            <span className="text-xs font-mono text-muted-foreground w-9 text-right">
+                              {task.progress}%
+                            </span>
+                          </div>
+                        ) : task.status === "FAILED" ? (
+                          <button
+                            type="button"
+                            className="text-xs text-destructive hover:underline truncate max-w-[140px] block mx-auto"
+                            title={task.error || ""}
+                            onClick={() =>
+                              setExpandedError(
+                                expandedError === task.id ? null : task.id,
+                              )
+                            }
+                          >
+                            {task.error || "未知错误"}
+                          </button>
+                        ) : task.status === "SUCCEEDED" ? (
+                          <span className="text-xs font-mono text-emerald-500 block text-center">
+                            100%
+                          </span>
                         ) : (
-                          <Trash2 className="w-4 h-4" />
+                          <span className="text-xs font-mono text-muted-foreground block text-center">
+                            --
+                          </span>
                         )}
-                      </Button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                      </td>
+                      <td className="hidden md:table-cell px-6 py-3 text-right text-xs font-mono text-muted-foreground">
+                        {new Date(task.createdAt).toLocaleString()}
+                      </td>
+                      <td className="px-4 sm:px-6 py-3 text-right">
+                        <Button
+                          size="icon-xs"
+                          variant="ghost"
+                          className="h-7 w-7"
+                          onClick={() => handleDelete(task.id, task.status)}
+                          title={
+                            task.status === "QUEUED" ||
+                            task.status === "RUNNING"
+                              ? "取消"
+                              : "删除"
+                          }
+                        >
+                          {task.status === "QUEUED" ||
+                          task.status === "RUNNING" ? (
+                            <XCircle className="w-4 h-4 text-amber-500" />
+                          ) : (
+                            <Trash2 className="w-4 h-4 text-muted-foreground hover:text-destructive" />
+                          )}
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
-        {/* 展开的错误详情 */}
+
         {expandedError && (
-          <div className="mx-6 mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded text-sm">
-            <div className="font-medium text-destructive mb-1">错误详情</div>
-            <div className="text-muted-foreground whitespace-pre-wrap">
+          <div className="mx-4 sm:mx-6 my-4 p-4 bg-destructive/10 border border-destructive/25 rounded-lg text-xs space-y-1">
+            <div className="font-semibold text-destructive">错误诊断详情</div>
+            <div className="text-muted-foreground font-mono whitespace-pre-wrap">
               {tasks.find((t) => t.id === expandedError)?.error || "无"}
             </div>
           </div>

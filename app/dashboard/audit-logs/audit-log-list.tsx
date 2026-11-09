@@ -1,7 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight, Loader2, Save } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+  Save,
+  ScrollText,
+} from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,26 +29,101 @@ type AuditLog = {
 };
 
 const ACTION_BADGE: Record<string, { label: string; className: string }> = {
-  FILE_UPLOAD:           { label: "上传",     className: "bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300" },
-  FILE_DELETE:           { label: "删除",     className: "bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300" },
-  FILE_BATCH_DELETE:     { label: "批量删除", className: "bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300" },
-  FILE_DELETE_RECURSIVE: { label: "递归删除", className: "bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300" },
-  FILE_RENAME:           { label: "重命名",   className: "bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300" },
-  FILE_COPY:             { label: "复制",     className: "bg-cyan-100 text-cyan-700 dark:bg-cyan-900/50 dark:text-cyan-300" },
-  FILE_DOWNLOAD:         { label: "下载",     className: "bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300" },
-  FILE_ZIP_DOWNLOAD:     { label: "ZIP下载",  className: "bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300" },
-  FOLDER_CREATE:         { label: "建文件夹", className: "bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300" },
-  AUTH_LOGIN:            { label: "登录",     className: "bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300" },
-  AUTH_LOGOUT:           { label: "登出",     className: "bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300" },
-  AUTH_PASSWORD_CHANGE:  { label: "改密码",   className: "bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300" },
-  PROVIDER_CREATE:         { label: "添加存储商", className: "bg-orange-100 text-orange-700 dark:bg-orange-900/50 dark:text-orange-300" },
-  PROVIDER_UPDATE:         { label: "更新存储商", className: "bg-orange-100 text-orange-700 dark:bg-orange-900/50 dark:text-orange-300" },
-  PROVIDER_DELETE:         { label: "删除存储商", className: "bg-orange-100 text-orange-700 dark:bg-orange-900/50 dark:text-orange-300" },
-  PROVIDER_TEST_CONNECTION:{ label: "测试连接",   className: "bg-orange-100 text-orange-700 dark:bg-orange-900/50 dark:text-orange-300" },
-  TRANSFER_CREATE:       { label: "创建传输", className: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300" },
-  TRANSFER_CANCEL:       { label: "取消传输", className: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300" },
+  FILE_UPLOAD: {
+    label: "上传",
+    className:
+      "bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/25",
+  },
+  FILE_DELETE: {
+    label: "删除",
+    className:
+      "bg-red-500/15 text-red-700 dark:text-red-300 border-red-500/25",
+  },
+  FILE_BATCH_DELETE: {
+    label: "批量删除",
+    className:
+      "bg-red-500/15 text-red-700 dark:text-red-300 border-red-500/25",
+  },
+  FILE_DELETE_RECURSIVE: {
+    label: "递归删除",
+    className:
+      "bg-red-500/15 text-red-700 dark:text-red-300 border-red-500/25",
+  },
+  FILE_RENAME: {
+    label: "重命名",
+    className:
+      "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/25",
+  },
+  FILE_COPY: {
+    label: "复制",
+    className:
+      "bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border-cyan-500/25",
+  },
+  FILE_DOWNLOAD: {
+    label: "下载",
+    className:
+      "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/25",
+  },
+  FILE_ZIP_DOWNLOAD: {
+    label: "ZIP下载",
+    className:
+      "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/25",
+  },
+  FOLDER_CREATE: {
+    label: "建文件夹",
+    className:
+      "bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/25",
+  },
+  AUTH_LOGIN: {
+    label: "登录",
+    className:
+      "bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/25",
+  },
+  AUTH_LOGOUT: {
+    label: "登出",
+    className:
+      "bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/25",
+  },
+  AUTH_PASSWORD_CHANGE: {
+    label: "改密码",
+    className:
+      "bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/25",
+  },
+  PROVIDER_CREATE: {
+    label: "添加存储商",
+    className:
+      "bg-orange-500/15 text-orange-700 dark:text-orange-300 border-orange-500/25",
+  },
+  PROVIDER_UPDATE: {
+    label: "更新存储商",
+    className:
+      "bg-orange-500/15 text-orange-700 dark:text-orange-300 border-orange-500/25",
+  },
+  PROVIDER_DELETE: {
+    label: "删除存储商",
+    className:
+      "bg-orange-500/15 text-orange-700 dark:text-orange-300 border-orange-500/25",
+  },
+  PROVIDER_TEST_CONNECTION: {
+    label: "测试连接",
+    className:
+      "bg-orange-500/15 text-orange-700 dark:text-orange-300 border-orange-500/25",
+  },
+  TRANSFER_CREATE: {
+    label: "创建传输",
+    className:
+      "bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border-indigo-500/25",
+  },
+  TRANSFER_CANCEL: {
+    label: "取消传输",
+    className:
+      "bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border-indigo-500/25",
+  },
 };
 
+/**
+ * 审计日志遥测记录列表与保留期策略设置组件
+ */
 export function AuditLogList() {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,14 +131,19 @@ export function AuditLogList() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [filters, setFilters] = useState<AuditLogFilters>({});
-  const [providers, setProviders] = useState<{ id: string; name: string }[]>([]);
+  const [providers, setProviders] = useState<{ id: string; name: string }[]>(
+    [],
+  );
   const [retentionDays, setRetentionDays] = useState("30");
   const [retentionSaving, setRetentionSaving] = useState(false);
 
   const fetchLogs = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ page: String(page), pageSize: "50" });
+      const params = new URLSearchParams({
+        page: String(page),
+        pageSize: "50",
+      });
       if (filters.action) params.set("action", filters.action);
       if (filters.status) params.set("status", filters.status);
       if (filters.providerId) params.set("providerId", filters.providerId);
@@ -87,7 +173,12 @@ export function AuditLogList() {
       .then((r) => r.json())
       .then((data) => {
         if (Array.isArray(data)) {
-          setProviders(data.map((p: { id: string; name: string }) => ({ id: p.id, name: p.name })));
+          setProviders(
+            data.map((p: { id: string; name: string }) => ({
+              id: p.id,
+              name: p.name,
+            })),
+          );
         }
       })
       .catch(() => {});
@@ -130,27 +221,48 @@ export function AuditLogList() {
   }
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
-      <div className="h-[57px] border-b px-6 flex items-center justify-between flex-shrink-0">
-        <h1 className="text-lg font-semibold">审计日志</h1>
-        <div className="flex items-center gap-2 text-sm">
-          <span className="text-muted-foreground text-xs">保留天数</span>
+    <div className="flex-1 flex flex-col overflow-hidden bg-architectural-grid">
+      <div className="min-h-14 border-b bg-card/70 backdrop-blur px-4 sm:px-6 py-2 flex flex-wrap items-center justify-between gap-2 shrink-0">
+        <div className="flex items-center gap-2.5">
+          <ScrollText className="w-4 h-4 text-primary" />
+          <h1 className="text-base sm:text-lg font-semibold tracking-tight">
+            审计日志
+          </h1>
+          <Badge
+            variant="outline"
+            className="font-mono text-[10px] hidden sm:inline-flex"
+          >
+            SECURITY TELEMETRY
+          </Badge>
+        </div>
+
+        <div className="flex items-center gap-2 text-xs">
+          <span className="text-muted-foreground font-mono">保留天数</span>
           <Input
             type="number"
             min={1}
             max={365}
             value={retentionDays}
             onChange={(e) => setRetentionDays(e.target.value)}
-            className="w-20 h-7 text-xs"
+            className="w-20 h-7 text-xs font-mono bg-background"
           />
           <Button
             size="sm"
             variant="outline"
             className="h-7 text-xs"
-            disabled={retentionSaving || !retentionDays || parseInt(retentionDays, 10) < 1 || parseInt(retentionDays, 10) > 365}
+            disabled={
+              retentionSaving ||
+              !retentionDays ||
+              parseInt(retentionDays, 10) < 1 ||
+              parseInt(retentionDays, 10) > 365
+            }
             onClick={handleSaveRetention}
           >
-            {retentionSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3 mr-1" />}
+            {retentionSaving ? (
+              <Loader2 className="w-3 h-3 animate-spin" />
+            ) : (
+              <Save className="w-3 h-3 mr-1" />
+            )}
             保存
           </Button>
         </div>
@@ -165,63 +277,102 @@ export function AuditLogList() {
 
       <div className="flex-1 overflow-auto">
         {loading ? (
-          <div className="flex items-center justify-center py-12 text-muted-foreground">
-            <Loader2 className="w-5 h-5 animate-spin mr-2" />加载中...
+          <div className="flex items-center justify-center py-16 text-muted-foreground text-sm">
+            <Loader2 className="w-5 h-5 animate-spin mr-2 text-primary" />
+            加载中...
           </div>
         ) : logs.length === 0 ? (
-          <div className="text-center text-muted-foreground py-12">
-            {Object.values(filters).some(Boolean) ? "没有匹配的记录" : "暂无审计日志"}
+          <div className="p-12 text-center space-y-2 text-muted-foreground">
+            <ScrollText className="w-8 h-8 mx-auto opacity-50" />
+            <p className="text-sm font-medium text-foreground">
+              {Object.values(filters).some(Boolean)
+                ? "没有匹配的记录"
+                : "暂无审计日志"}
+            </p>
           </div>
         ) : (
-          <table className="w-full text-sm">
-            <thead className="border-b sticky top-0 bg-background">
-              <tr>
-                <th className="px-6 py-3 text-left font-medium text-muted-foreground w-40">时间</th>
-                <th className="px-6 py-3 text-center font-medium text-muted-foreground w-28">类型</th>
-                <th className="px-6 py-3 text-left font-medium text-muted-foreground">描述</th>
-                <th className="px-6 py-3 text-left font-medium text-muted-foreground w-28">存储商</th>
-                <th className="px-6 py-3 text-center font-medium text-muted-foreground w-20">状态</th>
-                <th className="px-6 py-3 text-right font-medium text-muted-foreground w-32">IP</th>
-              </tr>
-            </thead>
-            <tbody>
-              {logs.map((log) => {
-                const badge = ACTION_BADGE[log.action] || { label: log.action, className: "bg-muted text-muted-foreground" };
-                return (
-                  <tr key={log.id} className="border-b hover:bg-muted/50">
-                    <td className="px-6 py-3 text-xs text-muted-foreground">
-                      {new Date(log.createdAt).toLocaleString()}
-                    </td>
-                    <td className="px-6 py-3 text-center">
-                      <Badge variant="ghost" className={`text-[11px] px-1.5 py-0.5 rounded ${badge.className}`}>
-                        {badge.label}
-                      </Badge>
-                    </td>
-                    <td className="px-6 py-3 truncate max-w-xs" title={log.description}>
-                      {log.description}
-                    </td>
-                    <td className="px-6 py-3 text-xs text-muted-foreground">
-                      {log.providerName || "--"}
-                    </td>
-                    <td className="px-6 py-3 text-center">
-                      <Badge variant={log.status === "SUCCESS" ? "outline" : "destructive"} className="text-[11px]">
-                        {log.status === "SUCCESS" ? "成功" : "失败"}
-                      </Badge>
-                    </td>
-                    <td className="px-6 py-3 text-right text-xs text-muted-foreground font-mono">
-                      {log.ipAddress}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs sm:text-sm border-collapse">
+              <thead className="border-b sticky top-0 bg-background/95 backdrop-blur z-10">
+                <tr className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground">
+                  <th className="px-4 sm:px-6 py-3 text-left font-medium w-44">
+                    时间 // TIMESTAMP
+                  </th>
+                  <th className="px-4 py-3 text-center font-medium w-28">
+                    类型
+                  </th>
+                  <th className="px-4 sm:px-6 py-3 text-left font-medium">
+                    描述 // EVENT
+                  </th>
+                  <th className="hidden md:table-cell px-4 py-3 text-left font-medium w-32">
+                    存储商
+                  </th>
+                  <th className="px-4 py-3 text-center font-medium w-24">
+                    状态
+                  </th>
+                  <th className="hidden sm:table-cell px-6 py-3 text-right font-medium w-36">
+                    IP
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/60 bg-card/40">
+                {logs.map((log) => {
+                  const badge = ACTION_BADGE[log.action] || {
+                    label: log.action,
+                    className: "bg-muted text-muted-foreground border-border",
+                  };
+                  return (
+                    <tr
+                      key={log.id}
+                      className="hover:bg-muted/50 transition-colors"
+                    >
+                      <td className="px-4 sm:px-6 py-3 text-xs font-mono text-muted-foreground whitespace-nowrap">
+                        {new Date(log.createdAt).toLocaleString()}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <Badge
+                          variant="outline"
+                          className={`text-[11px] px-2 py-0.5 rounded font-medium ${badge.className}`}
+                        >
+                          {badge.label}
+                        </Badge>
+                      </td>
+                      <td
+                        className="px-4 sm:px-6 py-3 truncate max-w-[200px] sm:max-w-md font-mono text-xs"
+                        title={log.description}
+                      >
+                        {log.description}
+                      </td>
+                      <td className="hidden md:table-cell px-4 py-3 text-xs text-muted-foreground">
+                        {log.providerName || "--"}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <Badge
+                          variant={
+                            log.status === "SUCCESS" ? "outline" : "destructive"
+                          }
+                          className="text-[11px]"
+                        >
+                          {log.status === "SUCCESS" ? "成功" : "失败"}
+                        </Badge>
+                      </td>
+                      <td className="hidden sm:table-cell px-6 py-3 text-right text-xs text-muted-foreground font-mono">
+                        {log.ipAddress}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
       {totalPages > 0 && (
-        <div className="border-t px-6 py-3 flex items-center justify-between flex-shrink-0 text-sm">
-          <span className="text-muted-foreground text-xs">共 {total} 条记录</span>
+        <div className="border-t bg-card/70 px-4 sm:px-6 py-3 flex items-center justify-between shrink-0 text-xs">
+          <span className="text-muted-foreground font-mono">
+            共 {total} 条记录
+          </span>
           <div className="flex items-center gap-2">
             <Button
               size="sm"
@@ -230,9 +381,10 @@ export function AuditLogList() {
               disabled={page <= 1}
               onClick={() => setPage((p) => p - 1)}
             >
-              <ChevronLeft className="w-3 h-3 mr-1" />上一页
+              <ChevronLeft className="w-3 h-3 mr-1" />
+              上一页
             </Button>
-            <span className="text-xs text-muted-foreground">
+            <span className="font-mono text-muted-foreground">
               {page} / {totalPages}
             </span>
             <Button
@@ -242,7 +394,8 @@ export function AuditLogList() {
               disabled={page >= totalPages}
               onClick={() => setPage((p) => p + 1)}
             >
-              下一页<ChevronRight className="w-3 h-3 ml-1" />
+              下一页
+              <ChevronRight className="w-3 h-3 ml-1" />
             </Button>
           </div>
         </div>

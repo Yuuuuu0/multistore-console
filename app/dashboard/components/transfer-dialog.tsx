@@ -1,11 +1,12 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
+import { ArrowRightLeft, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -29,10 +30,14 @@ type TransferDialogProps = {
   onChangeDstBucket: (value: string) => void;
 };
 
+/**
+ * 跨云对象异步流转任务创建对话框
+ */
 export function TransferDialog({
   open,
   providers,
   selectedProvider,
+  selectedBucket,
   transferKey,
   transferDstProvider,
   transferDstBucket,
@@ -43,17 +48,36 @@ export function TransferDialog({
   onChangeDstBucket,
 }: TransferDialogProps) {
   return (
-    <Dialog open={open} onOpenChange={(nextOpen: boolean) => !nextOpen && onClose()}>
-      <DialogContent className="max-w-sm">
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen: boolean) => !nextOpen && onClose()}
+    >
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>跨云传输</DialogTitle>
+          <div className="flex items-center gap-2">
+            <ArrowRightLeft className="w-4 h-4 text-primary" />
+            <DialogTitle className="text-base">跨云传输</DialogTitle>
+          </div>
+          <DialogDescription className="text-xs">
+            将对象从当前存储桶异步复制到其他云存储节点
+          </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4">
-          <div className="text-sm text-muted-foreground">文件: {transferKey.split("/").pop()}</div>
-          <div>
-            <label className="text-sm font-medium">目标存储商</label>
+
+        <div className="space-y-4 text-xs">
+          <div className="rounded-lg border bg-muted/30 p-3 space-y-1">
+            <div className="text-[10px] font-mono text-muted-foreground uppercase">
+              SOURCE OBJECT // 源对象
+            </div>
+            <div className="font-mono font-medium truncate">
+              {selectedBucket ? `${selectedBucket}/` : ""}
+              {transferKey.split("/").pop() || transferKey}
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium">目标存储商</label>
             <select
-              className="w-full border rounded-md px-3 py-2 mt-1"
+              className="w-full h-9 border border-input rounded-md px-3 py-1 text-sm bg-transparent dark:bg-input/30 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
               value={transferDstProvider}
               onChange={(e) => {
                 onChangeDstProvider(e.target.value);
@@ -70,10 +94,11 @@ export function TransferDialog({
                 ))}
             </select>
           </div>
-          <div>
-            <label className="text-sm font-medium">目标存储桶</label>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium">目标存储桶</label>
             <select
-              className="w-full border rounded-md px-3 py-2 mt-1"
+              className="w-full h-9 border border-input rounded-md px-3 py-1 text-sm bg-transparent dark:bg-input/30 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] disabled:opacity-50"
               value={transferDstBucket}
               onChange={(e) => onChangeDstBucket(e.target.value)}
               disabled={!transferDstProvider}
@@ -89,14 +114,20 @@ export function TransferDialog({
             </select>
           </div>
         </div>
+
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="outline" size="sm" onClick={onClose}>
             取消
           </Button>
-          <Button onClick={onTransfer} disabled={transferring || !transferDstProvider || !transferDstBucket}>
+          <Button
+            size="sm"
+            onClick={onTransfer}
+            disabled={transferring || !transferDstProvider || !transferDstBucket}
+          >
             {transferring ? (
               <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />传输中...
+                <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                传输中...
               </>
             ) : (
               "开始传输"

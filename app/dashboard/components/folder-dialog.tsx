@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { FolderPlus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -20,34 +22,61 @@ type FolderDialogProps = {
   onSubmit: InputDialogSubmit;
 };
 
-export function FolderDialog({ open, onClose, onSubmit }: FolderDialogProps) {
+function FolderDialogBody({
+  onClose,
+  onSubmit,
+}: {
+  onClose: () => void;
+  onSubmit: InputDialogSubmit;
+}) {
   const [value, setValue] = useState("");
 
-  useEffect(() => {
-    if (!open) setValue("");
-  }, [open]);
-
   return (
-    <Dialog open={open} onOpenChange={(nextOpen: boolean) => !nextOpen && onClose()}>
-      <DialogContent className="max-w-sm">
+    <>
+      <Input
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && value.trim() && onSubmit(value)}
+        placeholder="输入文件夹名称"
+        className="font-mono text-sm"
+        autoFocus
+      />
+      <DialogFooter>
+        <Button variant="outline" size="sm" onClick={onClose}>
+          取消
+        </Button>
+        <Button
+          size="sm"
+          onClick={() => onSubmit(value)}
+          disabled={!value.trim()}
+        >
+          创建
+        </Button>
+      </DialogFooter>
+    </>
+  );
+}
+
+/**
+ * 新建文件夹对话框
+ */
+export function FolderDialog({ open, onClose, onSubmit }: FolderDialogProps) {
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen: boolean) => !nextOpen && onClose()}
+    >
+      <DialogContent className="sm:max-w-sm">
         <DialogHeader>
-          <DialogTitle>新建文件夹</DialogTitle>
+          <div className="flex items-center gap-2">
+            <FolderPlus className="w-4 h-4 text-primary" />
+            <DialogTitle className="text-base">新建文件夹</DialogTitle>
+          </div>
+          <DialogDescription className="text-xs">
+            在当前路径下创建新的目录前缀
+          </DialogDescription>
         </DialogHeader>
-        <Input
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && onSubmit(value)}
-          placeholder="输入文件夹名称"
-          autoFocus
-        />
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            取消
-          </Button>
-          <Button onClick={() => onSubmit(value)} disabled={!value.trim()}>
-            创建
-          </Button>
-        </DialogFooter>
+        {open && <FolderDialogBody onClose={onClose} onSubmit={onSubmit} />}
       </DialogContent>
     </Dialog>
   );

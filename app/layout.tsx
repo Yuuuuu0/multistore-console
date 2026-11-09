@@ -17,8 +17,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "MultiStore Console",
-  description: "Multi-cloud object storage management console",
+  title: "MultiStore Console // 多云对象存储控制矩阵",
+  description: "自托管的多云对象存储统一控制台 — 支持 AWS S3、阿里云 OSS、腾讯云 COS 及 S3 兼容协议",
 };
 
 export default async function RootLayout({
@@ -29,19 +29,19 @@ export default async function RootLayout({
   await ensureInitialized();
 
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="zh-CN" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased`}
       >
         <SessionProvider>
           <ThemeProvider
             attribute="class"
-            defaultTheme="system"
+            defaultTheme="dark"
             enableSystem
             disableTransitionOnChange
           >
             {children}
-            <Toaster />
+            <Toaster position="bottom-right" richColors />
           </ThemeProvider>
         </SessionProvider>
       </body>

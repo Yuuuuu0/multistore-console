@@ -134,7 +134,7 @@ export function ProviderManager() {
     
     toast.success(editingProvider ? "更新成功" : "添加成功");
     setDialogOpen(false);
-    loadProviders(); } catch (error: unknown) { toast.error("网络错误"); }
+    loadProviders(); } catch { toast.error("网络错误"); }
   }
 
   async function handleDelete(id: string) {
@@ -146,7 +146,7 @@ export function ProviderManager() {
       loadProviders();
     } else {
       toast.error("删除失败");
-    } } catch (error: unknown) { toast.error("网络错误"); }
+    } } catch { toast.error("网络错误"); }
   }
 
   if (loading) {

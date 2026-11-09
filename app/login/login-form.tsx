@@ -3,6 +3,17 @@
 import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import {
+  ArrowRight,
+  Boxes,
+  HardDrive,
+  KeyRound,
+  Loader2,
+  Lock,
+  ShieldCheck,
+  User,
+} from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Footer } from "@/components/footer";
@@ -15,7 +26,16 @@ function GitHubIcon({ className }: { className?: string }) {
   );
 }
 
-export function LoginForm({ hasGithub, passwordLoginEnabled }: { hasGithub: boolean; passwordLoginEnabled: boolean }) {
+/**
+ * 控制台身份认证与登录门户组件
+ */
+export function LoginForm({
+  hasGithub,
+  passwordLoginEnabled,
+}: {
+  hasGithub: boolean;
+  passwordLoginEnabled: boolean;
+}) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -33,7 +53,11 @@ export function LoginForm({ hasGithub, passwordLoginEnabled }: { hasGithub: bool
     });
     setLoading(false);
     if (res?.error) {
-      setError(res.error === "密码登录已禁用" ? "密码登录已禁用，请使用 GitHub 登录" : "用户名或密码错误");
+      setError(
+        res.error === "密码登录已禁用"
+          ? "密码登录已禁用，请使用 GitHub 登录"
+          : "用户名或密码错误",
+      );
     } else {
       router.push("/dashboard");
       router.refresh();
@@ -43,52 +67,185 @@ export function LoginForm({ hasGithub, passwordLoginEnabled }: { hasGithub: bool
   const showDivider = passwordLoginEnabled && hasGithub;
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center">
-      <div className="w-full max-w-sm space-y-6 p-8 border rounded-lg shadow-sm">
-        <h1 className="text-2xl font-bold text-center">MultiStore Console</h1>
-        {passwordLoginEnabled && (
-          <form onSubmit={handleCredentials} className="space-y-4">
-            <Input
-              placeholder="用户名"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              required
-            />
-            <Input
-              type="password"
-              placeholder="密码"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-            {error && <p className="text-sm text-destructive">{error}</p>}
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "登录中..." : "登录"}
-            </Button>
-          </form>
-        )}
-        {showDivider && (
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
+    <div className="min-h-dvh bg-background bg-architectural-grid flex flex-col lg:flex-row">
+      {/* 左侧工业架构海报区 */}
+      <div className="hidden lg:flex lg:w-7/12 border-r border-border bg-sidebar/60 p-12 flex-col justify-between relative overflow-hidden">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-primary text-primary-foreground flex items-center justify-center shadow-sm">
+              <Boxes className="w-5 h-5" />
             </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">或</span>
+            <div>
+              <div className="font-semibold text-base tracking-tight">
+                MultiStore Console
+              </div>
+              <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-muted-foreground">
+                UNIFIED OBJECT STORAGE MATRIX
+              </div>
             </div>
           </div>
-        )}
-        {hasGithub && (
-          <Button
-            variant="outline"
-            className="w-full"
-            onClick={() => signIn("github", { callbackUrl: "/dashboard" })}
-          >
-            <GitHubIcon className="w-5 h-5 mr-2" />
-            使用 GitHub 登录
-          </Button>
-        )}
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border bg-background/70 text-[11px] font-mono text-emerald-500">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            SYSTEM READY
+          </span>
+        </div>
+
+        <div className="max-w-xl space-y-6 my-auto">
+          <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded border border-primary/30 bg-primary/10 text-primary text-xs font-mono">
+            <span>S3 // OSS // COS // R2 // MINIO</span>
+          </div>
+          <h2 className="text-4xl xl:text-5xl font-bold tracking-tight leading-[1.12]">
+            多云对象存储的
+            <br />
+            <span className="text-primary">精密控制中枢</span>
+          </h2>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            在单一低延迟工作台内统一编排 AWS S3、阿里云 OSS、腾讯云 COS 及 S3
+            兼容存储桶。支持预签名并发直传、大文件分片断点续传、CORS
+            直传策略诊断、跨云异步流转与全链路操作审计。
+          </p>
+
+          <div className="grid grid-cols-3 gap-3 pt-4">
+            <div className="rounded-lg border bg-card/70 p-3.5 space-y-1">
+              <HardDrive className="w-4 h-4 text-primary" />
+              <div className="text-xs font-semibold pt-1">多云统一挂载</div>
+              <div className="text-[11px] text-muted-foreground font-mono">
+                Multi-Provider IO
+              </div>
+            </div>
+            <div className="rounded-lg border bg-card/70 p-3.5 space-y-1">
+              <ShieldCheck className="w-4 h-4 text-primary" />
+              <div className="text-xs font-semibold pt-1">直传与分片引擎</div>
+              <div className="text-[11px] text-muted-foreground font-mono">
+                CORS & Multipart
+              </div>
+            </div>
+            <div className="rounded-lg border bg-card/70 p-3.5 space-y-1">
+              <KeyRound className="w-4 h-4 text-primary" />
+              <div className="text-xs font-semibold pt-1">凭据加密与审计</div>
+              <div className="text-[11px] text-muted-foreground font-mono">
+                AES-256 & Audit
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="text-xs font-mono text-muted-foreground flex items-center justify-between border-t border-border/60 pt-4">
+          <span>SELF-HOSTED OBJECT GATEWAY</span>
+          <span>PROTOCOL // S3 V4 SIGNATURE</span>
+        </div>
       </div>
-      <Footer />
+
+      {/* 右侧身份验证终端 */}
+      <div className="flex-1 flex flex-col justify-between p-6 sm:p-10">
+        <div className="flex lg:hidden items-center gap-2.5">
+          <div className="w-8 h-8 rounded-lg bg-primary text-primary-foreground flex items-center justify-center">
+            <Boxes className="w-4 h-4" />
+          </div>
+          <span className="font-semibold text-base">MultiStore Console</span>
+        </div>
+
+        <div className="w-full max-w-sm mx-auto my-auto space-y-6">
+          <div className="rounded-xl border bg-card/90 backdrop-blur p-6 sm:p-8 shadow-sm space-y-6">
+            <div className="space-y-1.5">
+              <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-primary">
+                AUTHENTICATION // 身份验证
+              </div>
+              <h1 className="text-2xl font-bold tracking-tight">
+                MultiStore Console
+              </h1>
+              <p className="text-xs text-muted-foreground">
+                请验证管理员凭据以进入对象存储控制台
+              </p>
+            </div>
+
+            {passwordLoginEnabled && (
+              <form onSubmit={handleCredentials} className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">
+                    用户名
+                  </label>
+                  <div className="relative">
+                    <User className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <Input
+                      placeholder="用户名"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      className="pl-9"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-muted-foreground">
+                    密码
+                  </label>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <Input
+                      type="password"
+                      placeholder="密码"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="pl-9"
+                      required
+                    />
+                  </div>
+                </div>
+
+                {error && (
+                  <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                    {error}
+                  </div>
+                )}
+
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      登录中...
+                    </>
+                  ) : (
+                    <>
+                      <span>登录</span>
+                      <ArrowRight className="w-4 h-4 ml-1.5" />
+                    </>
+                  )}
+                </Button>
+              </form>
+            )}
+
+            {showDivider && (
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-card px-2 text-muted-foreground font-mono">
+                    或
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {hasGithub && (
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => signIn("github", { callbackUrl: "/dashboard" })}
+              >
+                <GitHubIcon className="w-4 h-4 mr-2" />
+                使用 GitHub 登录
+              </Button>
+            )}
+          </div>
+        </div>
+
+        <div className="max-w-sm w-full mx-auto">
+          <Footer />
+        </div>
+      </div>
     </div>
   );
 }

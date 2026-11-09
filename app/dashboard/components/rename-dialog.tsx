@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { Edit2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -21,31 +23,70 @@ type RenameDialogProps = {
   onSubmit: InputDialogSubmit;
 };
 
-export function RenameDialog({ open, currentName, onClose, onSubmit }: RenameDialogProps) {
+function RenameDialogBody({
+  currentName,
+  onClose,
+  onSubmit,
+}: {
+  currentName: string;
+  onClose: () => void;
+  onSubmit: InputDialogSubmit;
+}) {
   const [value, setValue] = useState(currentName);
 
-  useEffect(() => {
-    setValue(currentName);
-  }, [currentName, open]);
-
   return (
-    <Dialog open={open} onOpenChange={(nextOpen: boolean) => !nextOpen && onClose()}>
-      <DialogContent className="max-w-sm">
+    <>
+      <Input
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && onSubmit(value)}
+        className="font-mono text-sm"
+        autoFocus
+      />
+      <DialogFooter>
+        <Button variant="outline" size="sm" onClick={onClose}>
+          取消
+        </Button>
+        <Button size="sm" onClick={() => onSubmit(value)}>
+          确认
+        </Button>
+      </DialogFooter>
+    </>
+  );
+}
+
+/**
+ * 对象或目录重命名对话框
+ */
+export function RenameDialog({
+  open,
+  currentName,
+  onClose,
+  onSubmit,
+}: RenameDialogProps) {
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen: boolean) => !nextOpen && onClose()}
+    >
+      <DialogContent className="sm:max-w-sm">
         <DialogHeader>
-          <DialogTitle>重命名</DialogTitle>
+          <div className="flex items-center gap-2">
+            <Edit2 className="w-4 h-4 text-primary" />
+            <DialogTitle className="text-base">重命名</DialogTitle>
+          </div>
+          <DialogDescription className="text-xs">
+            输入新的对象或文件夹名称
+          </DialogDescription>
         </DialogHeader>
-        <Input
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && onSubmit(value)}
-          autoFocus
-        />
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            取消
-          </Button>
-          <Button onClick={() => onSubmit(value)}>确认</Button>
-        </DialogFooter>
+        {open && (
+          <RenameDialogBody
+            key={currentName}
+            currentName={currentName}
+            onClose={onClose}
+            onSubmit={onSubmit}
+          />
+        )}
       </DialogContent>
     </Dialog>
   );

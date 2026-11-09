@@ -1,5 +1,7 @@
 "use client";
 
+import { RotateCcw } from "lucide-react";
+
 import {
   Select,
   SelectContent,
@@ -67,15 +69,26 @@ type AuditLogFiltersProps = {
   onReset: () => void;
 };
 
-export function AuditLogFiltersBar({ filters, providers, onFiltersChange, onReset }: AuditLogFiltersProps) {
+/**
+ * 审计日志多维筛选栏组件
+ */
+export function AuditLogFiltersBar({
+  filters,
+  providers,
+  onFiltersChange,
+  onReset,
+}: AuditLogFiltersProps) {
   function update(patch: Partial<AuditLogFilters>) {
     onFiltersChange({ ...filters, ...patch });
   }
 
   return (
-    <div className="border-b px-6 py-3 flex items-center gap-3 flex-wrap flex-shrink-0">
-      <Select value={filters.action || "ALL"} onValueChange={(v) => update({ action: v === "ALL" ? undefined : v })}>
-        <SelectTrigger className="w-[140px] h-8 text-xs">
+    <div className="border-b bg-muted/20 px-4 sm:px-6 py-2.5 flex items-center gap-2.5 flex-wrap shrink-0">
+      <Select
+        value={filters.action || "ALL"}
+        onValueChange={(v) => update({ action: v === "ALL" ? undefined : v })}
+      >
+        <SelectTrigger className="w-[140px] h-8 text-xs bg-background">
           <SelectValue placeholder="操作类型" />
         </SelectTrigger>
         <SelectContent>
@@ -93,8 +106,11 @@ export function AuditLogFiltersBar({ filters, providers, onFiltersChange, onRese
         </SelectContent>
       </Select>
 
-      <Select value={filters.status || "ALL"} onValueChange={(v) => update({ status: v === "ALL" ? undefined : v })}>
-        <SelectTrigger className="w-[100px] h-8 text-xs">
+      <Select
+        value={filters.status || "ALL"}
+        onValueChange={(v) => update({ status: v === "ALL" ? undefined : v })}
+      >
+        <SelectTrigger className="w-[110px] h-8 text-xs bg-background">
           <SelectValue placeholder="状态" />
         </SelectTrigger>
         <SelectContent>
@@ -107,9 +123,11 @@ export function AuditLogFiltersBar({ filters, providers, onFiltersChange, onRese
       {providers.length > 0 && (
         <Select
           value={filters.providerId || "ALL"}
-          onValueChange={(v) => update({ providerId: v === "ALL" ? undefined : v })}
+          onValueChange={(v) =>
+            update({ providerId: v === "ALL" ? undefined : v })
+          }
         >
-          <SelectTrigger className="w-[140px] h-8 text-xs">
+          <SelectTrigger className="w-[140px] h-8 text-xs bg-background">
             <SelectValue placeholder="存储商" />
           </SelectTrigger>
           <SelectContent>
@@ -123,23 +141,29 @@ export function AuditLogFiltersBar({ filters, providers, onFiltersChange, onRese
         </Select>
       )}
 
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1.5">
         <input
           type="date"
           value={filters.startDate || ""}
           onChange={(e) => update({ startDate: e.target.value || undefined })}
-          className="h-8 px-2 text-xs border rounded-md bg-background"
+          className="h-8 px-2.5 text-xs font-mono border rounded-md bg-background"
         />
         <span className="text-muted-foreground text-xs">~</span>
         <input
           type="date"
           value={filters.endDate || ""}
           onChange={(e) => update({ endDate: e.target.value || undefined })}
-          className="h-8 px-2 text-xs border rounded-md bg-background"
+          className="h-8 px-2.5 text-xs font-mono border rounded-md bg-background"
         />
       </div>
 
-      <Button size="sm" variant="ghost" onClick={onReset} className="h-7 text-xs">
+      <Button
+        size="sm"
+        variant="ghost"
+        onClick={onReset}
+        className="h-8 text-xs"
+      >
+        <RotateCcw className="w-3 h-3 mr-1" />
         重置
       </Button>
     </div>
