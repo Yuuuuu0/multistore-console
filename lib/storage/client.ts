@@ -11,6 +11,7 @@ export type ProviderConfig = {
   disableChunked?: boolean | null;
 };
 
+/** 根据已保存的 endpoint 和地址方式创建 S3 兼容客户端。 */
 export function createS3Client(config: ProviderConfig): S3Client {
   // 对于 OSS，尝试从 endpoint 提取 region
   let region = config.region || "us-east-1";
@@ -26,6 +27,9 @@ export function createS3Client(config: ProviderConfig): S3Client {
     region,
     endpoint: config.endpoint || undefined,
     forcePathStyle: config.forcePathStyle ?? !!config.endpoint,
+    // 无 body 预签名不能带空内容的 CRC32；兼容服务也可能不支持 aws-chunked。
+    requestChecksumCalculation: "WHEN_REQUIRED",
+    responseChecksumValidation: "WHEN_REQUIRED",
     credentials: {
       accessKeyId: config.accessKeyId,
       secretAccessKey: decrypt(config.secretAccessKey),
@@ -36,20 +40,20 @@ export function createS3Client(config: ProviderConfig): S3Client {
   client.middlewareStack.add(
     (next) => async (args) => {
       const req = args.request as { body?: string | Uint8Array; headers?: Record<string, string> };
-      if (req?.body && req.headers && !req.headers["content-md5"]) {
+      if ((typeof req?.body === "string" || req?.body instanceof Uint8Array) && req.headers && !req.headers["content-md5"]) {
         const body = typeof req.body === "string" ? Buffer.from(req.body) : req.body;
         req.headers["content-md5"] = createHash("md5").update(body).digest("base64");
       }
       return next(args);
     },
-    { step: "finalizeRequest", name: "addContentMD5" }
+    { step: "build", name: "addContentMD5" }
   );
 
   // 部分 S3 兼容厂商（如 OSS）不支持 aws-chunked；通过 guard 防止误发该类请求
   if (config.disableChunked) {
     client.middlewareStack.add(
       (next) => async (args) => {
-        const req = args.request as any;
+        const req = args.request as { headers?: Record<string, string> };
         const encoding = req?.headers?.["content-encoding"];
         if (typeof encoding === "string" && encoding.includes("aws-chunked")) {
           throw new Error("当前 Provider 禁用 aws-chunked：请使用 presigned PUT 或 multipart 上传");

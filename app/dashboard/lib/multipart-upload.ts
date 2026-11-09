@@ -1,3 +1,5 @@
+import { DIRECT_UPLOAD_NETWORK_ERROR, readUploadApiError, storageUploadError } from "./upload-errors";
+
 export type PartStatus = "pending" | "uploading" | "completed" | "failed";
 
 export type PartProgress = {
@@ -122,7 +124,7 @@ export function createMultipartUploader(options: MultipartUploadOptions) {
 
   // Speed calculation state
   const speedSamples: { time: number; bytes: number }[] = [];
-  let lastUploadedBytes = 0;
+  const partErrors = new Map<number, string>();
 
   const state: MultipartUploadState = {
     fileId,
@@ -161,7 +163,6 @@ export function createMultipartUploader(options: MultipartUploadOptions) {
         state.estimatedRemaining = state.speed > 0 ? remaining / state.speed : 0;
       }
     }
-    lastUploadedBytes = state.uploadedBytes;
     onProgress({ ...state, parts: [...state.parts], completedParts: [...state.completedParts] });
   }
 
@@ -212,7 +213,7 @@ export function createMultipartUploader(options: MultipartUploadOptions) {
           body: JSON.stringify({ bucket, key, uploadId: state.uploadId, partNumber }),
         });
         if (!presignRes.ok) {
-          throw new Error("获取预签名 URL 失败");
+          throw new Error(await readUploadApiError(presignRes, "获取分片签名失败"));
         }
         const { url } = await presignRes.json();
 
@@ -242,17 +243,17 @@ export function createMultipartUploader(options: MultipartUploadOptions) {
               if (responseEtag) {
                 resolve(responseEtag);
               } else {
-                reject(new Error("No ETag in response"));
+                reject(new Error("分片已上传，但浏览器无法读取 ETag。请在存储桶 CORS 首条匹配当前站点 PUT 的规则中设置 ExposeHeaders: [\"ETag\"]，保存后重试或断点续传。"));
               }
             } else {
-              reject(new Error(`Upload failed: ${xhr.status}`));
+              reject(new Error(storageUploadError(xhr.status, xhr.responseText)));
             }
           };
 
           xhr.onerror = () => {
             const idx = abortControllers.indexOf(ctrl);
             if (idx >= 0) abortControllers.splice(idx, 1);
-            reject(new Error("Network error"));
+            reject(new Error(DIRECT_UPLOAD_NETWORK_ERROR));
           };
 
           xhr.onabort = () => {
@@ -266,6 +267,7 @@ export function createMultipartUploader(options: MultipartUploadOptions) {
         });
 
         // Success
+        partErrors.delete(partNumber);
         state.parts[partIndex].status = "completed";
         state.parts[partIndex].loaded = end - start;
         state.completedParts.push({ partNumber, etag });
@@ -279,12 +281,17 @@ export function createMultipartUploader(options: MultipartUploadOptions) {
         if (msg === "Aborted") return false;
 
         retries++;
-        if (retries <= maxRetries) {
+        if (retries <= maxRetries && !msg.includes("无法读取 ETag")) {
+          state.parts[partIndex].loaded = 0;
+          state.uploadedBytes = state.parts.reduce((sum, p) => sum + p.loaded, 0);
           await new Promise((r) => setTimeout(r, 1000 * retries));
           continue;
         }
 
+        partErrors.set(partNumber, msg);
         state.parts[partIndex].status = "failed";
+        state.parts[partIndex].loaded = 0;
+        state.uploadedBytes = state.parts.reduce((sum, p) => sum + p.loaded, 0);
         report();
         return false;
       }
@@ -325,7 +332,7 @@ export function createMultipartUploader(options: MultipartUploadOptions) {
     if (failCount > 0) {
       state.status = "failed";
       report();
-      onError(`${failCount} 个分片上传失败`);
+      onError(`${failCount} 个分片上传失败：${Array.from(partErrors, ([part, error]) => `分片 ${part}：${error}`)[0]}`);
       return;
     }
 

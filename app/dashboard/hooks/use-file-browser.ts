@@ -345,6 +345,8 @@ export function useFileBrowser() {
         onProgress: (progress) => {
           setUploadProgress(progress);
         },
+        onError: (error, task) => toast.error(`${task.file.name}：${error}`),
+        onWarning: (warning, task) => toast.warning(`${task.file.name}：${warning}`),
         onComplete: (result) => {
           setUploading(false);
           setUploadProgress({ completed: 0, failed: 0, total: 0, currentFiles: [] });

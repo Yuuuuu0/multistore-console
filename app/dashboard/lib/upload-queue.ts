@@ -1,3 +1,5 @@
+import { DIRECT_UPLOAD_NETWORK_ERROR, readUploadApiError, storageUploadError } from "./upload-errors";
+
 export type UploadTask = {
   file: File;
   key: string;
@@ -16,6 +18,8 @@ type UploadQueueOptions = {
   bucket: string;
   onProgress: (progress: UploadProgress) => void;
   onComplete: (result: { ok: number; fail: number }) => void;
+  onError?: (error: string, task: UploadTask) => void;
+  onWarning?: (warning: string, task: UploadTask) => void;
 };
 
 export function createUploadQueue(options: UploadQueueOptions) {
@@ -35,53 +39,72 @@ export function createUploadQueue(options: UploadQueueOptions) {
     });
   }
 
+  /** 先获取签名再由浏览器 PUT 文件；完成确认失败只警告，不重复发送文件。 */
   async function uploadOne(task: UploadTask): Promise<boolean> {
     const fileName = task.key.split("/").pop() || task.file.name;
     currentFiles.add(fileName);
     reportProgress();
-
-    let retries = 0;
-    const maxRetries = 2;
-
-    while (retries <= maxRetries) {
-      if (cancelled) return false;
-      try {
-        const params = new URLSearchParams({ bucket, key: task.key });
-        const res = await fetch(`/api/fs/${providerId}/upload?${params}`, {
-          method: "POST",
-          body: task.file,
-          headers: { "Content-Type": task.file.type || "application/octet-stream" },
-        });
-
-        if (res.ok) {
-          currentFiles.delete(fileName);
-          return true;
+    try {
+      for (let attempt = 0; attempt <= 2; attempt++) {
+        if (cancelled) return false;
+        const contentType = task.file.type || "application/octet-stream";
+        const params = new URLSearchParams({ bucket, key: task.key, contentType });
+        let res: Response;
+        try {
+          res = await fetch(`/api/fs/${providerId}/presign-put?${params}`, { cache: "no-store" });
+        } catch {
+          throw new Error("获取上传签名失败，请检查控制台连接后重试");
         }
-
-        // 429 时退避重试
-        if (res.status === 429 && retries < maxRetries) {
-          const data = await res.json().catch(() => ({ retryAfterMs: 1500 }));
-          const delay = (data as { retryAfterMs?: number }).retryAfterMs || 1500;
-          await new Promise((r) => setTimeout(r, delay * (retries + 1)));
-          retries++;
-          continue;
+        if (!res.ok) {
+          if (res.status === 429 && attempt < 2) {
+            const data = await res.json().catch(() => ({}));
+            await new Promise((r) => setTimeout(r, (data.retryAfterMs || 1500) * (attempt + 1)));
+            continue;
+          }
+          throw new Error(await readUploadApiError(res, "获取上传签名失败"));
         }
-
-        currentFiles.delete(fileName);
-        return false;
-      } catch {
-        if (retries < maxRetries) {
-          retries++;
-          await new Promise((r) => setTimeout(r, 1000 * retries));
-          continue;
+        const signed = await res.json();
+        if (cancelled) return false;
+        let uploaded: Response;
+        try {
+          uploaded = await fetch(signed.url, {
+            method: signed.method,
+            headers: signed.headers,
+            body: task.file,
+            credentials: "omit",
+          });
+        } catch {
+          if (attempt < 2) {
+            await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+            continue;
+          }
+          throw new Error(DIRECT_UPLOAD_NETWORK_ERROR);
         }
-        currentFiles.delete(fileName);
-        return false;
+        if (!uploaded.ok) {
+          if ((uploaded.status === 429 || uploaded.status >= 500) && attempt < 2) {
+            await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+            continue;
+          }
+          throw new Error(storageUploadError(uploaded.status, await uploaded.text()));
+        }
+        try {
+          const confirmed = await fetch(`/api/fs/${providerId}/upload-complete`, {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ bucket, key: task.key, fileSize: task.file.size }),
+          });
+          if (!confirmed.ok) throw new Error(await readUploadApiError(confirmed, "完成确认失败"));
+        } catch (error) {
+          options.onWarning?.(`文件已直传成功，但完成确认失败：${error instanceof Error ? error.message : "控制台连接异常"}。请刷新列表核对，不会自动重新上传。`, task);
+        }
+        return true;
       }
+      return false;
+    } catch (error) {
+      options.onError?.(error instanceof Error ? error.message : "上传失败", task);
+      return false;
+    } finally {
+      currentFiles.delete(fileName);
     }
-
-    currentFiles.delete(fileName);
-    return false;
   }
 
   async function run() {

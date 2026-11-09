@@ -13,6 +13,10 @@ import {
   CompleteMultipartUploadCommand,
   AbortMultipartUploadCommand,
   ListPartsCommand,
+  GetBucketCorsCommand,
+  PutBucketCorsCommand,
+  type CORSRule,
+  type PutObjectCommandInput,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import type { Readable } from "stream";
@@ -30,6 +34,7 @@ export type ListObjectsResult = {
   nextContinuationToken?: string;
 };
 
+/** 统一封装 S3 兼容服务的对象操作、预签名和桶 CORS 控制面。 */
 export class StorageAdapter {
   constructor(private client: S3Client) {}
 
@@ -70,7 +75,7 @@ export class StorageAdapter {
     contentLength?: number
   ): Promise<void> {
     await this.client.send(
-      new PutObjectCommand({ Bucket: bucket, Key: key, Body: body as any, ContentLength: contentLength })
+      new PutObjectCommand({ Bucket: bucket, Key: key, Body: body as PutObjectCommandInput["Body"], ContentLength: contentLength })
     );
   }
 
@@ -113,6 +118,7 @@ export class StorageAdapter {
     return getSignedUrl(this.client, command, { expiresIn });
   }
 
+  /** 为 bucket/key 签名 PUT；显式 contentType 纳入签名，返回 URL 不绑定未知文件 checksum。 */
   async getPresignedPutUrl(
     bucket: string,
     key: string,
@@ -127,8 +133,24 @@ export class StorageAdapter {
         Key: key,
         ...(contentType ? { ContentType: contentType } : {}),
       }),
-      { expiresIn }
+      { expiresIn, ...(contentType ? { signableHeaders: new Set(["content-type"]) } : {}) }
     );
+  }
+
+  /** 读取 bucket 的全部 CORS 规则；仅明确无配置时返回空数组。 */
+  async getBucketCors(bucket: string): Promise<CORSRule[]> {
+    try {
+      const result = await this.client.send(new GetBucketCorsCommand({ Bucket: bucket }));
+      return result.CORSRules ?? [];
+    } catch (error) {
+      if (error instanceof Error && error.name === "NoSuchCORSConfiguration") return [];
+      throw error;
+    }
+  }
+
+  /** 用完整 rules 写入 bucket CORS；调用方负责先读后合并，错误向上传递。 */
+  async putBucketCors(bucket: string, rules: CORSRule[]): Promise<void> {
+    await this.client.send(new PutBucketCorsCommand({ Bucket: bucket, CORSConfiguration: { CORSRules: rules } }));
   }
 
   // ---- Multipart Upload Methods ----
